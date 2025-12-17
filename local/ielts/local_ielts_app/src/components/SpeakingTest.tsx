@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Button, Progress, Modal, message, Tabs } from "antd";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Button, Progress, Modal, message, Tabs, Empty } from "antd";
 import {
   AudioOutlined,
   PauseOutlined,
@@ -9,17 +9,8 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
+import { useExamStore } from "../store/examStore";
 import styles from "./SpeakingTest.module.css";
-
-interface SpeakingPart {
-  id: number;
-  partNumber: 1 | 2 | 3;
-  title: string;
-  description: string;
-  questions: string[];
-  preparationTime?: number; // For Part 2
-  speakingTime: number;
-}
 
 interface SpeakingTestProps {
   recordings: { [partId: number]: Blob };
@@ -27,7 +18,8 @@ interface SpeakingTestProps {
 }
 
 const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
-  const [activePart, setActivePart] = useState("1");
+  const { examData } = useExamStore();
+  const [activePartIndex, setActivePartIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [prepTime, setPrepTime] = useState(0);
@@ -40,61 +32,33 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<number | null>(null);
 
-  // Mock data - sẽ thay bằng data thật từ API
-  const parts: SpeakingPart[] = [
-    {
-      id: 1,
-      partNumber: 1,
-      title: "Part 1: Introduction & Interview",
-      description:
-        "The examiner will ask you general questions about yourself and a range of familiar topics.",
-      questions: [
-        "What is your full name?",
-        "Where are you from?",
-        "Do you work or study?",
-        "What do you like about your job/studies?",
-        "Let's talk about your hometown. What's special about it?",
-        "Is there anything you would like to change about your hometown?",
-      ],
-      speakingTime: 300, // 5 minutes
-    },
-    {
-      id: 2,
-      partNumber: 2,
-      title: "Part 2: Long Turn (Cue Card)",
-      description:
-        "You will be given a topic card. You have 1 minute to prepare, then speak for 1-2 minutes.",
-      questions: [
-        "Describe a place you have visited that you particularly liked.",
-        "",
-        "You should say:",
-        "• where it was",
-        "• when you went there",
-        "• what you did there",
-        "• and explain why you liked it so much",
-      ],
-      preparationTime: 60, // 1 minute prep
-      speakingTime: 120, // 2 minutes
-    },
-    {
-      id: 3,
-      partNumber: 3,
-      title: "Part 3: Discussion",
-      description:
-        "The examiner will ask further questions connected to the topic in Part 2.",
-      questions: [
-        "What types of places are popular for tourists in your country?",
-        "Do you think tourism has a positive or negative impact on local communities?",
-        "How do you think tourism will change in the future?",
-        "What can be done to make tourism more sustainable?",
-        "Do you think virtual tourism could replace real travel?",
-      ],
-      speakingTime: 300, // 5 minutes
-    },
-  ];
+  // Get speaking parts from examData
+  const parts = useMemo(() => examData?.speaking || [], [examData]);
 
-  const currentPart =
-    parts.find((p) => p.id === parseInt(activePart)) || parts[0];
+  // Get current part
+  const currentPart = parts[activePartIndex];
+
+  // Default speaking times based on part number
+  const getSpeakingTime = (part: typeof currentPart) => {
+    if (!part) return 300;
+    if (part.speakingTime) return part.speakingTime;
+    switch (part.partNumber) {
+      case 1:
+        return 300; // 5 minutes
+      case 2:
+        return 120; // 2 minutes
+      case 3:
+        return 300; // 5 minutes
+      default:
+        return 300;
+    }
+  };
+
+  const getPreparationTime = (part: typeof currentPart) => {
+    if (!part) return 0;
+    if (part.preparationTime) return part.preparationTime;
+    return part.partNumber === 2 ? 60 : 0; // 1 minute prep for Part 2
+  };
 
   // Cleanup on unmount
   useEffect(() => {
@@ -104,7 +68,7 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
     };
   }, [audioUrl]);
 
-  // Reset when changing parts
+  // Reset when changing parts or examData
   useEffect(() => {
     stopRecording();
     setAudioUrl(null);
@@ -113,12 +77,19 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
     setIsPreparing(false);
 
     // Check if there's existing recording
-    const existingRecording = recordings[currentPart.id];
-    if (existingRecording) {
-      const url = URL.createObjectURL(existingRecording);
-      setAudioUrl(url);
+    if (currentPart) {
+      const existingRecording = recordings[currentPart.id];
+      if (existingRecording) {
+        const url = URL.createObjectURL(existingRecording);
+        setAudioUrl(url);
+      }
     }
-  }, [activePart, currentPart.id, recordings]);
+  }, [activePartIndex, currentPart?.id, recordings]);
+
+  // Reset index when examData changes
+  useEffect(() => {
+    setActivePartIndex(0);
+  }, [examData]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -128,15 +99,18 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
       .padStart(2, "0")}`;
   };
 
+  const speakingTime = getSpeakingTime(currentPart);
+  const preparationTime = getPreparationTime(currentPart);
+
   // Preparation timer (for Part 2)
   const startPreparation = useCallback(() => {
-    if (!currentPart.preparationTime) {
+    if (!preparationTime) {
       startRecording();
       return;
     }
 
     setIsPreparing(true);
-    setPrepTime(currentPart.preparationTime);
+    setPrepTime(preparationTime);
 
     timerRef.current = setInterval(() => {
       setPrepTime((prev) => {
@@ -149,10 +123,12 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
         return prev - 1;
       });
     }, 1000);
-  }, [currentPart.preparationTime]);
+  }, [preparationTime]);
 
   // Start recording
   const startRecording = useCallback(async () => {
+    if (!currentPart) return;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -182,10 +158,10 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
       // Recording timer
       timerRef.current = setInterval(() => {
         setRecordTime((prev) => {
-          if (prev >= currentPart.speakingTime) {
+          if (prev >= speakingTime) {
             stopRecording();
             message.warning("Maximum speaking time reached.");
-            return currentPart.speakingTime;
+            return speakingTime;
           }
           return prev + 1;
         });
@@ -200,7 +176,7 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
           "Please allow microphone access to record your speaking response.",
       });
     }
-  }, [currentPart.id, currentPart.speakingTime, onRecordingChange]);
+  }, [currentPart?.id, speakingTime, onRecordingChange]);
 
   // Stop recording
   const stopRecording = useCallback(() => {
@@ -236,7 +212,7 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         setAudioUrl(null);
         setRecordTime(0);
-        if (currentPart.preparationTime) {
+        if (preparationTime) {
           startPreparation();
         } else {
           startRecording();
@@ -245,7 +221,17 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
     });
   };
 
-  const recordingProgress = (recordTime / currentPart.speakingTime) * 100;
+  if (!examData || parts.length === 0) {
+    return (
+      <div className={styles.containerWrapper}>
+        <div className={styles.emptyState}>
+          <Empty description="No speaking parts available" />
+        </div>
+      </div>
+    );
+  }
+
+  const recordingProgress = (recordTime / speakingTime) * 100;
 
   return (
     <div className={styles.containerWrapper}>
@@ -254,19 +240,23 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
         <div className={styles.instructionPanel}>
           <div className={styles.partHeader}>
             <span className={styles.partBadge}>
-              PART {currentPart.partNumber}
+              PART {currentPart?.partNumber || activePartIndex + 1}
             </span>
           </div>
-          <h1 className={styles.partTitle}>{currentPart.title}</h1>
-          <p className={styles.partDescription}>{currentPart.description}</p>
+          <h1 className={styles.partTitle}>
+            {currentPart?.title || `Part ${activePartIndex + 1}`}
+          </h1>
+          <p className={styles.partDescription}>
+            {currentPart?.description || ""}
+          </p>
 
           {/* Questions/Prompts */}
           <div className={styles.questionCard}>
             <h3 className={styles.questionCardTitle}>
-              {currentPart.partNumber === 2 ? "Cue Card" : "Sample Questions"}
+              {currentPart?.partNumber === 2 ? "Cue Card" : "Sample Questions"}
             </h3>
             <div className={styles.questionList}>
-              {currentPart.questions.map((question, index) => (
+              {currentPart?.questions?.map((question, index) => (
                 <div
                   key={index}
                   className={`${styles.questionItem} ${
@@ -282,7 +272,7 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
                     )}
                   <span>{question}</span>
                 </div>
-              ))}
+              )) || <div>No questions available</div>}
             </div>
           </div>
 
@@ -290,25 +280,32 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
           <div className={styles.tipsBox}>
             <h4>Speaking Tips</h4>
             <ul>
-              {currentPart.partNumber === 1 && (
+              {currentPart?.partNumber === 1 && (
                 <>
                   <li>Speak naturally and don't memorize answers</li>
                   <li>Give extended answers, not just yes/no</li>
                   <li>Use a variety of vocabulary and structures</li>
                 </>
               )}
-              {currentPart.partNumber === 2 && (
+              {currentPart?.partNumber === 2 && (
                 <>
                   <li>Use the preparation time to make notes</li>
                   <li>Cover all the bullet points</li>
                   <li>Speak for the full 2 minutes if possible</li>
                 </>
               )}
-              {currentPart.partNumber === 3 && (
+              {currentPart?.partNumber === 3 && (
                 <>
                   <li>Give your opinion clearly</li>
                   <li>Support your ideas with examples</li>
                   <li>Discuss different perspectives</li>
+                </>
+              )}
+              {(!currentPart?.partNumber || currentPart.partNumber > 3) && (
+                <>
+                  <li>Speak clearly and at a natural pace</li>
+                  <li>Use a variety of vocabulary</li>
+                  <li>Support your ideas with examples</li>
                 </>
               )}
             </ul>
@@ -317,16 +314,16 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
           {/* Part Tabs */}
           <div className={styles.partTabs}>
             <Tabs
-              activeKey={activePart}
-              onChange={setActivePart}
-              items={parts.map((part) => ({
-                key: part.id.toString(),
+              activeKey={activePartIndex.toString()}
+              onChange={(key) => setActivePartIndex(parseInt(key))}
+              items={parts.map((part, index) => ({
+                key: index.toString(),
                 label: (
                   <span className={styles.tabLabel}>
                     {recordings[part.id] && (
                       <CheckCircleOutlined style={{ color: "#10b981" }} />
                     )}
-                    Part {part.partNumber}
+                    Part {part.partNumber || index + 1}
                   </span>
                 ),
               }))}
@@ -346,9 +343,7 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
                 <span className={styles.prepLabel}>Preparation Time</span>
                 <span className={styles.prepTime}>{formatTime(prepTime)}</span>
                 <Progress
-                  percent={
-                    (prepTime / (currentPart.preparationTime || 60)) * 100
-                  }
+                  percent={(prepTime / (preparationTime || 60)) * 100}
                   showInfo={false}
                   strokeColor="#f59e0b"
                 />
@@ -424,8 +419,7 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
                 }}
                 format={() => (
                   <span>
-                    {formatTime(recordTime)} /{" "}
-                    {formatTime(currentPart.speakingTime)}
+                    {formatTime(recordTime)} / {formatTime(speakingTime)}
                   </span>
                 )}
               />
@@ -439,16 +433,10 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
                 type="primary"
                 size="large"
                 icon={<AudioOutlined />}
-                onClick={
-                  currentPart.preparationTime
-                    ? startPreparation
-                    : startRecording
-                }
+                onClick={preparationTime ? startPreparation : startRecording}
                 className={styles.startButton}
               >
-                {currentPart.preparationTime
-                  ? "Start Preparation"
-                  : "Start Recording"}
+                {preparationTime ? "Start Preparation" : "Start Recording"}
               </Button>
             )}
 
@@ -500,7 +488,7 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
               <li>Make sure your microphone is working properly</li>
               <li>Speak clearly and at a natural pace</li>
               <li>You can re-record if needed</li>
-              {currentPart.preparationTime && (
+              {preparationTime > 0 && (
                 <li>Use the preparation time to organize your thoughts</li>
               )}
             </ul>
@@ -512,23 +500,26 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
       <div className={styles.bottomNavigation}>
         <div className={styles.partInfo}>
           <span className={styles.currentPart}>
-            Current: <strong>{currentPart.title}</strong>
+            Current:{" "}
+            <strong>
+              {currentPart?.title || `Part ${activePartIndex + 1}`}
+            </strong>
           </span>
           <span className={styles.timeLimit}>
-            Time limit: <strong>{formatTime(currentPart.speakingTime)}</strong>
+            Time limit: <strong>{formatTime(speakingTime)}</strong>
           </span>
         </div>
 
         <div className={styles.partsProgress}>
-          {parts.map((part) => (
+          {parts.map((part, index) => (
             <div
               key={part.id}
               className={`${styles.partProgressItem} ${
-                part.id === currentPart.id ? styles.activeProgress : ""
+                index === activePartIndex ? styles.activeProgress : ""
               }`}
             >
               <span className={styles.partProgressLabel}>
-                Part {part.partNumber}:
+                Part {part.partNumber || index + 1}:
               </span>
               <span
                 className={`${styles.partProgressValue} ${

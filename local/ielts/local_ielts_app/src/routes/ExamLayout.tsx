@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense, useMemo } from "react";
+import { useEffect, useState, Suspense, useMemo, useRef } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Layout, Button, Spin, Modal, message } from "antd";
 import {
@@ -34,7 +34,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     currentSkill,
     setSkill,
     timeLeft,
-    tickTimer,
+    updateTimeLeft,
     isSubmitted,
     submitExam,
     answers,
@@ -48,9 +48,12 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     submitAssessment,
     isLoading,
     error,
+    isApiInitialized,
   } = useExamStore();
 
   const [loading, setLoading] = useState(true);
+  // Track the previous timeLeft value to detect when it goes from >0 to 0
+  const prevTimeLeftRef = useRef<number>(0);
 
   // Get available skills from exam data
   const availableSkills = useMemo(
@@ -64,8 +67,10 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     return availableSkills.indexOf(currentSkill) === availableSkills.length - 1;
   }, [availableSkills, currentSkill]);
 
-  // 1. INIT: Load exam data from API
+  // 1. INIT: Load exam data from API (only after API is initialized)
   useEffect(() => {
+    if (!isApiInitialized) return; // Wait for API to be initialized
+
     const initExam = async () => {
       // Get exam ID from URL params (required)
       const urlParams = new URLSearchParams(window.location.search);
@@ -77,33 +82,64 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     };
 
     initExam();
-  }, [loadExam]);
+  }, [isApiInitialized, loadExam]);
 
-  // 2. Set initial skill to first available skill
+  // Helper to get duration - uses examData.durations per skill, with fallback to defaults
+  const getEffectiveDuration = (skill: SkillType): number => {
+    return getSkillDuration(skill, examData);
+  };
+
+  // 2. Set initial skill and timer when exam loads
   useEffect(() => {
     if (loading || !examData || availableSkills.length === 0) return;
 
     // If current skill is not available in this exam, switch to first available
     if (!availableSkills.includes(currentSkill)) {
       const firstSkill = availableSkills[0];
-      setSkill(firstSkill, getSkillDuration(firstSkill));
+      setSkill(firstSkill, getEffectiveDuration(firstSkill));
+    } else if (timeLeft === 0) {
+      // Current skill is available but timer not set yet - initialize it
+      setSkill(currentSkill, getEffectiveDuration(currentSkill));
     }
-  }, [loading, examData, availableSkills, currentSkill, setSkill]);
+  }, [loading, examData, availableSkills, currentSkill, setSkill, timeLeft]);
 
-  // 3. TIMER: Countdown
+  // 3. TIMER: Update timeLeft based on endTime (accurate even after tab switch)
   useEffect(() => {
-    if (loading || isSubmitted) return;
+    // Don't start timer until exam is loaded and has valid time
+    if (loading || isSubmitted || !examData || timeLeft <= 0) return;
 
     const timer = setInterval(() => {
-      tickTimer();
+      updateTimeLeft();
     }, 1000);
 
-    if (timeLeft === 0 && !loading) {
+    // Also update immediately when tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        updateTimeLeft();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loading, isSubmitted, examData, timeLeft > 0, updateTimeLeft]);
+
+  // Handle timeout separately - only when timeLeft transitions from >0 to 0
+  useEffect(() => {
+    // Only trigger timeout if timeLeft was > 0 before and is now 0
+    if (
+      prevTimeLeftRef.current > 0 &&
+      timeLeft === 0 &&
+      !isSubmitted &&
+      examData
+    ) {
       handleTimeOut();
     }
-
-    return () => clearInterval(timer);
-  }, [timeLeft, loading, isSubmitted, tickTimer]);
+    // Update the ref with current value
+    prevTimeLeftRef.current = timeLeft;
+  }, [timeLeft, isSubmitted, examData]);
 
   // Navigate based on current skill (only if skill is available)
   useEffect(() => {
@@ -133,7 +169,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     const nextSkill = getNextSkill(currentSkill, availableSkills);
 
     if (nextSkill) {
-      setSkill(nextSkill, getSkillDuration(nextSkill));
+      setSkill(nextSkill, getEffectiveDuration(nextSkill));
     } else {
       // No more skills, submit the exam
       handleSubmit();

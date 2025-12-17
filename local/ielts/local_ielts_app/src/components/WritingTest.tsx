@@ -1,21 +1,12 @@
-import { useState, useEffect } from "react";
-import { Tabs, Progress, Tooltip } from "antd";
+import { useState, useEffect, useMemo } from "react";
+import { Tabs, Progress, Tooltip, Empty } from "antd";
 import {
   FileTextOutlined,
   BarChartOutlined,
   InfoCircleOutlined,
 } from "@ant-design/icons";
+import { useExamStore } from "../store/examStore";
 import styles from "./WritingTest.module.css";
-
-interface WritingTask {
-  id: number;
-  type: "TASK_1" | "TASK_2";
-  title: string;
-  prompt: string;
-  imageUrl?: string;
-  minWords: number;
-  timeRecommendation: string;
-}
 
 interface WritingTestProps {
   essays: { [taskId: number]: string };
@@ -23,20 +14,24 @@ interface WritingTestProps {
 }
 
 const WritingTest = ({ essays, onEssayChange }: WritingTestProps) => {
-  const [activeTask, setActiveTask] = useState("1");
+  const { examData } = useExamStore();
+  const [activeTaskIndex, setActiveTaskIndex] = useState(0);
   const [localEssays, setLocalEssays] = useState<{ [taskId: number]: string }>(
     {}
   );
+
+  // Get writing tasks from examData
+  const tasks = useMemo(() => examData?.writing || [], [examData]);
 
   // Sync local state with props
   useEffect(() => {
     setLocalEssays(essays);
   }, [essays]);
 
-  // Reset state when component mounts
+  // Reset state when component mounts or examData changes
   useEffect(() => {
-    setActiveTask("1");
-  }, []);
+    setActiveTaskIndex(0);
+  }, [examData]);
 
   // Handle essay change - update both local and parent state
   const handleEssayChange = (taskId: number, content: string) => {
@@ -44,67 +39,48 @@ const WritingTest = ({ essays, onEssayChange }: WritingTestProps) => {
     onEssayChange(taskId, content);
   };
 
-  // Word count function - simple function, not memoized
+  // Word count function
   const countWords = (text: string): number => {
     if (!text) return 0;
     const trimmed = text.trim();
     if (!trimmed) return 0;
-    // Match all word characters (including Unicode letters)
     const words = trimmed.match(/\S+/g);
     return words ? words.length : 0;
   };
 
-  // Mock data - sẽ thay bằng data thật từ API
-  const tasks: WritingTask[] = [
-    {
-      id: 1,
-      type: "TASK_1",
-      title: "Writing Task 1",
-      prompt: `The chart below shows the percentage of households in owned and rented accommodation in England and Wales between 1918 and 2011.
+  if (!examData || tasks.length === 0) {
+    return (
+      <div className={styles.containerWrapper}>
+        <div className={styles.emptyState}>
+          <Empty description="No writing tasks available" />
+        </div>
+      </div>
+    );
+  }
 
-Summarise the information by selecting and reporting the main features, and make comparisons where relevant.
-
-Write at least 150 words.`,
-      imageUrl: "/images/chart-task1.png",
-      minWords: 150,
-      timeRecommendation: "You should spend about 20 minutes on this task.",
-    },
-    {
-      id: 2,
-      type: "TASK_2",
-      title: "Writing Task 2",
-      prompt: `Some people think that the best way to reduce crime is to give longer prison sentences. Others, however, believe there are better alternative ways of reducing crime.
-
-Discuss both views and give your opinion.
-
-Give reasons for your answer and include any relevant examples from your own knowledge or experience.
-
-Write at least 250 words.`,
-      minWords: 250,
-      timeRecommendation: "You should spend about 40 minutes on this task.",
-    },
-  ];
-
-  const currentTask =
-    tasks.find((t) => t.id === parseInt(activeTask)) || tasks[0];
+  const currentTask = tasks[activeTaskIndex];
   const currentEssay = localEssays[currentTask.id] || "";
   const wordCount = countWords(currentEssay);
-  const progressPercent = Math.min(
-    (wordCount / currentTask.minWords) * 100,
-    100
-  );
+  const minWords =
+    currentTask.minWords || (currentTask.type === "TASK_1" ? 150 : 250);
+  const progressPercent = Math.min((wordCount / minWords) * 100, 100);
 
   const getProgressStatus = () => {
-    if (wordCount >= currentTask.minWords) return "success";
-    if (wordCount >= currentTask.minWords * 0.7) return "active";
+    if (wordCount >= minWords) return "success";
+    if (wordCount >= minWords * 0.7) return "active";
     return "exception";
   };
 
   const getWordCountColor = () => {
-    if (wordCount >= currentTask.minWords) return "#10b981";
-    if (wordCount >= currentTask.minWords * 0.7) return "#f59e0b";
+    if (wordCount >= minWords) return "#10b981";
+    if (wordCount >= minWords * 0.7) return "#f59e0b";
     return "#ef4444";
   };
+
+  const timeRecommendation =
+    currentTask.type === "TASK_1"
+      ? "You should spend about 20 minutes on this task."
+      : "You should spend about 40 minutes on this task.";
 
   return (
     <div className={styles.containerWrapper}>
@@ -120,7 +96,7 @@ Write at least 250 words.`,
 
           <div className={styles.timeRecommendation}>
             <InfoCircleOutlined />
-            <span>{currentTask.timeRecommendation}</span>
+            <span>{timeRecommendation}</span>
           </div>
 
           {/* Task Image (for Task 1) */}
@@ -171,10 +147,10 @@ Write at least 250 words.`,
           {/* Task Tabs */}
           <div className={styles.taskTabs}>
             <Tabs
-              activeKey={activeTask}
-              onChange={setActiveTask}
-              items={tasks.map((task) => ({
-                key: task.id.toString(),
+              activeKey={activeTaskIndex.toString()}
+              onChange={(key) => setActiveTaskIndex(parseInt(key))}
+              items={tasks.map((task, index) => ({
+                key: index.toString(),
                 label: (
                   <span className={styles.tabLabel}>
                     {task.type === "TASK_1" ? (
@@ -195,12 +171,12 @@ Write at least 250 words.`,
           <div className={styles.editorHeader}>
             <h3>Your Response</h3>
             <div className={styles.wordCountDisplay}>
-              <Tooltip title={`Target: ${currentTask.minWords} words minimum`}>
+              <Tooltip title={`Target: ${minWords} words minimum`}>
                 <span
                   className={styles.wordCount}
                   style={{ color: getWordCountColor() }}
                 >
-                  {wordCount} / {currentTask.minWords} words
+                  {wordCount} / {minWords} words
                 </span>
               </Tooltip>
             </div>
@@ -227,9 +203,9 @@ Write at least 250 words.`,
               strokeColor={getWordCountColor()}
               format={() => (
                 <span style={{ color: getWordCountColor() }}>
-                  {wordCount >= currentTask.minWords
+                  {wordCount >= minWords
                     ? "✓ Minimum reached"
-                    : `${currentTask.minWords - wordCount} more words needed`}
+                    : `${minWords - wordCount} more words needed`}
                 </span>
               )}
             />
@@ -259,19 +235,21 @@ Write at least 250 words.`,
             Current: <strong>{currentTask.title}</strong>
           </span>
           <span className={styles.wordRequirement}>
-            Minimum: <strong>{currentTask.minWords} words</strong>
+            Minimum: <strong>{minWords} words</strong>
           </span>
         </div>
 
         <div className={styles.taskProgress}>
-          {tasks.map((task) => {
+          {tasks.map((task, index) => {
             const taskWords = countWords(localEssays[task.id] || "");
-            const isComplete = taskWords >= task.minWords;
+            const taskMinWords =
+              task.minWords || (task.type === "TASK_1" ? 150 : 250);
+            const isComplete = taskWords >= taskMinWords;
             return (
               <div
                 key={task.id}
                 className={`${styles.taskProgressItem} ${
-                  task.id === currentTask.id ? styles.activeProgress : ""
+                  index === activeTaskIndex ? styles.activeProgress : ""
                 }`}
               >
                 <span className={styles.taskProgressLabel}>{task.title}:</span>

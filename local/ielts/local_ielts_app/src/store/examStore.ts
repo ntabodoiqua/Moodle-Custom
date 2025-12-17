@@ -21,9 +21,13 @@ interface ExamState {
   currentExamId: number | null; // Track loaded exam ID
 
   // Trạng thái làm bài
-  timeLeft: number; // Thời gian còn lại (giây)
+  timeLeft: number; // Thời gian còn lại (giây) - computed from endTime
+  endTime: number | null; // Timestamp khi hết giờ (ms) - source of truth for timer
+  startTime: number | null; // Timestamp khi bắt đầu làm bài (ms)
+  timeTaken: number | null; // Thời gian đã làm bài (giây) - set khi submit
   isLoading: boolean; // Loading state for async operations
   error: string | null; // Error message if any
+  isApiInitialized: boolean; // Track if API has been initialized
 
   // Lưu bài làm
   answers: UserAnswers; // Reading & Listening
@@ -40,7 +44,7 @@ interface ExamState {
   setRecording: (partId: number, audioBlob: Blob) => void;
 
   // Timer
-  tickTimer: () => void;
+  updateTimeLeft: () => void; // Recalculate timeLeft from endTime
 
   isSubmitted: boolean;
   submitExam: () => void; // Legacy sync action
@@ -56,8 +60,12 @@ export const useExamStore = create<ExamState>((set, get) => ({
   currentSkill: "READING", // Mặc định vào là Reading
   currentExamId: null,
   timeLeft: 0,
+  endTime: null,
+  startTime: null,
+  timeTaken: null,
   isLoading: false,
   error: null,
+  isApiInitialized: false,
 
   answers: {},
   writingEssays: {},
@@ -72,11 +80,17 @@ export const useExamStore = create<ExamState>((set, get) => ({
       timeLeft: 3600,
     }),
 
-  setSkill: (skill, duration) =>
+  setSkill: (skill, duration) => {
+    const state = get();
+    const now = Date.now();
     set({
       currentSkill: skill,
       timeLeft: duration,
-    }),
+      endTime: now + duration * 1000, // Set end time based on duration
+      // Set startTime only once (first skill)
+      startTime: state.startTime ?? now,
+    });
+  },
 
   setAnswer: (qId, val) =>
     set((state) => ({
@@ -93,17 +107,30 @@ export const useExamStore = create<ExamState>((set, get) => ({
       speakingAudio: { ...state.speakingAudio, [partId]: audioBlob },
     })),
 
-  tickTimer: () =>
-    set((state) => ({
-      timeLeft: state.timeLeft > 0 ? state.timeLeft - 1 : 0,
-    })),
+  // Recalculate timeLeft from endTime - accurate even after tab switch
+  updateTimeLeft: () =>
+    set((state) => {
+      if (!state.endTime) return { timeLeft: 0 };
+      const remaining = Math.max(
+        0,
+        Math.floor((state.endTime - Date.now()) / 1000)
+      );
+      return { timeLeft: remaining };
+    }),
 
   isSubmitted: false,
-  submitExam: () => set({ isSubmitted: true }),
+  submitExam: () => {
+    const { startTime } = get();
+    const now = Date.now();
+    // Calculate time taken in seconds
+    const taken = startTime ? Math.floor((now - startTime) / 1000) : null;
+    set({ isSubmitted: true, timeTaken: taken });
+  },
 
   // Initialize API with Moodle config
   initApi: (config: MoodleConfig) => {
     initializeApi(config);
+    set({ isApiInitialized: true });
   },
 
   // Load exam data from API

@@ -666,10 +666,16 @@
   margin-left: 44px;
 }
 
+.answerComparison {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
 .answerLabel {
   display: inline-block;
   font-size: 14px;
-  margin-bottom: 10px;
 }
 
 .correctLabel {
@@ -681,10 +687,8 @@
 }
 
 .yourAnswer {
-  display: block;
   font-size: 13px;
   color: #6b7280;
-  margin-bottom: 10px;
 }
 
 .actionBtns {

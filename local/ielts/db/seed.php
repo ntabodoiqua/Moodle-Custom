@@ -142,7 +142,7 @@ $listening_data = [
     [
         'id' => 201,
         'title' => 'Section 1',
-        'description' => 'A conversation between two people set in an everyday social context',
+        'instruction' => 'A conversation between two people set in an everyday social context',
         'audioUrl' => '/audio/section1.mp3',
         'groups' => [
             [
@@ -339,7 +339,13 @@ $speaking_data = [
 $exam_data = [
     'id' => 1,
     'title' => 'IELTS Full Mock Test 01 (Academic)',
-    'duration' => 10800, // 3 hours in seconds (Reading 60 + Listening 40 + Writing 60 + Speaking 15)
+    'duration' => 10800, // 3 hours in seconds (deprecated, use durations instead)
+    'durations' => [
+        'reading' => 3600,   // 60 minutes
+        'listening' => 2400, // 40 minutes
+        'writing' => 3600,   // 60 minutes
+        'speaking' => 900,   // 15 minutes
+    ],
     'reading' => $reading_data,
     'listening' => $listening_data,
     'writing' => $writing_data,
@@ -391,14 +397,29 @@ if ($existing) {
 // 2. Process Individual Skill Exams
 $skill_exams = [
     [
-        'id' => 2, 'title' => 'IELTS Reading Practice Test 01', 'duration' => 3600,
+        'id' => 2, 
+        'title' => 'IELTS Reading Practice Test 01', 
+        'durations' => ['reading' => 3600], // 60 minutes
         'reading' => $exam_data['reading']
     ],
     [
-        'id' => 3, 'title' => 'IELTS Listening Practice Test 01', 'duration' => 2400,
+        'id' => 3, 
+        'title' => 'IELTS Listening Practice Test 01', 
+        'durations' => ['listening' => 2400], // 40 minutes
         'listening' => $exam_data['listening']
     ],
-    // Thêm các skill khác nếu cần...
+    [
+        'id' => 4,
+        'title' => 'IELTS Writing Practice Test 01',
+        'durations' => ['writing' => 3600], // 60 minutes
+        'writing' => $exam_data['writing']
+    ],
+    [
+        'id' => 5,
+        'title' => 'IELTS Speaking Practice Test 01',
+        'durations' => ['speaking' => 900], // 15 minutes
+        'speaking' => $exam_data['speaking']
+    ],
 ];
 
 foreach ($skill_exams as $exam) {

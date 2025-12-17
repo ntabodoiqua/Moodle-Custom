@@ -1,18 +1,12 @@
-import { useState, useEffect, useRef } from "react";
-import { Select, Slider, Button } from "antd";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Select, Slider, Button, Empty } from "antd";
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   SoundOutlined,
 } from "@ant-design/icons";
+import { useExamStore } from "../store/examStore";
 import styles from "./ListeningTest.module.css";
-
-interface Question {
-  id: number;
-  type: "dropdown" | "input";
-  text: string;
-  options?: string[];
-}
 
 interface ListeningTestProps {
   answers: { [key: number]: string };
@@ -20,19 +14,36 @@ interface ListeningTestProps {
 }
 
 const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
-  const [currentSection, setCurrentSection] = useState(1);
-  const [currentQuestion, setCurrentQuestion] = useState(1);
+  const { examData } = useExamStore();
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(80);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Reset state when component mounts
+  // Get listening sections from examData
+  const sections = useMemo(() => examData?.listening || [], [examData]);
+
+  // Get current section
+  const currentSection = sections[currentSectionIndex];
+
+  // Get all question IDs for current section
+  const currentQuestionIds = useMemo(() => {
+    if (!currentSection) return [];
+    const ids: number[] = [];
+    currentSection.groups.forEach((group) => {
+      group.questions.forEach((q) => {
+        ids.push(q.id);
+      });
+    });
+    return ids;
+  }, [currentSection]);
+
+  // Reset state when component mounts or examData changes
   useEffect(() => {
-    setCurrentSection(1);
-    setCurrentQuestion(1);
-  }, []);
+    setCurrentSectionIndex(0);
+  }, [examData]);
 
   // Function to scroll to a specific question
   const scrollToQuestion = (questionId: number) => {
@@ -42,7 +53,6 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
         behavior: "smooth",
         block: "center",
       });
-      setCurrentQuestion(questionId);
     }
   };
 
@@ -92,89 +102,40 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
       .padStart(2, "0")}`;
   };
 
-  // Mock data - sẽ thay bằng data thật từ API
-  const sections = [
-    {
-      id: 1,
-      title: "Section 1",
-      description:
-        "A conversation between two people set in an everyday social context",
-      audioUrl: "/audio/section1.mp3",
-      questionGroups: [
-        {
-          title: "Questions 1-5",
-          instruction:
-            "Complete the form below. Write NO MORE THAN TWO WORDS AND/OR A NUMBER for each answer.",
-          questions: [
-            { id: 1, type: "input" as const, text: "Name: Sarah _______" },
-            { id: 2, type: "input" as const, text: "Phone number: _______" },
-            { id: 3, type: "input" as const, text: "Address: _______ Street" },
-            { id: 4, type: "input" as const, text: "Postcode: _______" },
-            { id: 5, type: "input" as const, text: "Email: sarah@_______" },
-          ],
-        },
-        {
-          title: "Questions 6-10",
-          instruction: "Choose the correct letter, A, B or C.",
-          questions: [
-            {
-              id: 6,
-              type: "dropdown" as const,
-              text: "What time does the tour start?",
-              options: ["A. 9:00 AM", "B. 10:00 AM", "C. 11:00 AM"],
-            },
-            {
-              id: 7,
-              type: "dropdown" as const,
-              text: "How long does the tour take?",
-              options: ["A. 1 hour", "B. 2 hours", "C. 3 hours"],
-            },
-            {
-              id: 8,
-              type: "dropdown" as const,
-              text: "What is the cost per person?",
-              options: ["A. $15", "B. $20", "C. $25"],
-            },
-            {
-              id: 9,
-              type: "dropdown" as const,
-              text: "What should visitors bring?",
-              options: ["A. Camera", "B. Water bottle", "C. Both A and B"],
-            },
-            {
-              id: 10,
-              type: "dropdown" as const,
-              text: "Where do they meet?",
-              options: ["A. Main entrance", "B. Café", "C. Gift shop"],
-            },
-          ],
-        },
-      ],
-    },
-  ];
+  // Determine input type based on question type
+  const isDropdown = (type: string) => {
+    return type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE";
+  };
 
-  const currentSectionData = sections.find((s) => s.id === currentSection);
-  const allQuestions: Question[] =
-    currentSectionData?.questionGroups.flatMap(
-      (g): Question[] => g.questions
-    ) || [];
+  if (!examData || sections.length === 0) {
+    return (
+      <div className={styles.containerWrapper}>
+        <div className={styles.emptyState}>
+          <Empty description="No listening sections available" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.containerWrapper}>
       <div className={styles.container}>
         {/* Left Panel - Audio Player & Instructions */}
         <div className={styles.audioPanel}>
-          <div className={styles.sectionHeader}>SECTION {currentSection}</div>
-          <h1 className={styles.sectionTitle}>{currentSectionData?.title}</h1>
+          <div className={styles.sectionHeader}>
+            SECTION {currentSectionIndex + 1}
+          </div>
+          <h1 className={styles.sectionTitle}>{currentSection?.title}</h1>
           <p className={styles.sectionDescription}>
-            {currentSectionData?.description}
+            {currentSection?.instruction ||
+              "Listen carefully and answer the questions."}
           </p>
 
           {/* Audio Player */}
           <div className={styles.audioPlayer}>
             <audio
               ref={audioRef}
-              src={currentSectionData?.audioUrl}
+              src={currentSection?.audioUrl}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onEnded={() => setIsPlaying(false)}
@@ -232,15 +193,15 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
 
           {/* Section Tabs */}
           <div className={styles.sectionTabs}>
-            {[1, 2, 3, 4].map((section) => (
+            {sections.map((_, index) => (
               <button
-                key={section}
+                key={index}
                 className={`${styles.sectionTab} ${
-                  section === currentSection ? styles.activeTab : ""
+                  index === currentSectionIndex ? styles.activeTab : ""
                 }`}
-                onClick={() => setCurrentSection(section)}
+                onClick={() => setCurrentSectionIndex(index)}
               >
-                Section {section}
+                Section {index + 1}
               </button>
             ))}
           </div>
@@ -248,8 +209,8 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
 
         {/* Right Panel - Questions */}
         <div className={styles.questionsPanel}>
-          {currentSectionData?.questionGroups.map((group, groupIndex) => (
-            <div key={groupIndex} className={styles.questionSection}>
+          {currentSection?.groups.map((group) => (
+            <div key={group.id} className={styles.questionSection}>
               <h3 className={styles.questionSectionTitle}>{group.title}</h3>
 
               {group.instruction && (
@@ -266,9 +227,12 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
                 >
                   <div className={styles.questionNumber}>{question.id}.</div>
                   <div className={styles.questionContent}>
-                    <div className={styles.questionText}>{question.text}</div>
+                    <div
+                      className={styles.questionText}
+                      dangerouslySetInnerHTML={{ __html: question.text }}
+                    />
 
-                    {question.type === "dropdown" && question.options ? (
+                    {isDropdown(question.type) && question.options ? (
                       <Select
                         className={styles.answerSelect}
                         placeholder="Select answer"
@@ -300,31 +264,51 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
 
       {/* Question Navigation - Fixed at bottom */}
       <div className={styles.questionNavigation}>
-        <span className={styles.sectionLabel}>Section {currentSection}</span>
-        <div className={styles.questionButtons}>
-          {allQuestions.map((q) => (
+        <div className={styles.sectionTabs}>
+          {sections.map((_, index) => (
             <button
-              key={q.id}
-              className={`${styles.questionButton} ${
-                q.id === currentQuestion ? styles.active : ""
-              } ${answers[q.id] ? styles.completed : ""}`}
-              onClick={() => scrollToQuestion(q.id)}
+              key={index}
+              className={`${styles.sectionTab} ${
+                index === currentSectionIndex ? styles.activeTab : ""
+              }`}
+              onClick={() => setCurrentSectionIndex(index)}
             >
-              {q.id}
+              Section {index + 1}
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.questionButtons}>
+          {currentQuestionIds.map((id) => (
+            <button
+              key={id}
+              className={`${styles.questionButton} ${
+                answers[id] ? styles.completed : ""
+              }`}
+              onClick={() => scrollToQuestion(id)}
+            >
+              {id}
             </button>
           ))}
         </div>
 
         <div className={styles.progressInfo}>
-          <div className={styles.progressItem}>
-            <strong>Section 2:</strong> 0 of 10 questions
-          </div>
-          <div className={styles.progressItem}>
-            <strong>Section 3:</strong> 0 of 10 questions
-          </div>
-          <div className={styles.progressItem}>
-            <strong>Section 4:</strong> 0 of 10 questions
-          </div>
+          {sections.map((section, index) => {
+            if (index === currentSectionIndex) return null;
+            const sectionQuestionIds: number[] = [];
+            section.groups.forEach((g) =>
+              g.questions.forEach((q) => sectionQuestionIds.push(q.id))
+            );
+            const answered = sectionQuestionIds.filter(
+              (id) => answers[id]
+            ).length;
+            return (
+              <div key={index} className={styles.progressItem}>
+                <strong>Section {index + 1}:</strong> {answered} of{" "}
+                {sectionQuestionIds.length} questions
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

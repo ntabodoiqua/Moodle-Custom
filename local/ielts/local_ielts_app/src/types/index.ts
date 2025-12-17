@@ -47,6 +47,7 @@ export interface ReadingPassage {
 export interface ListeningSection {
   id: number;
   title: string; // Vd: "Section 1"
+  instruction?: string; // Optional instruction for the section
   audioUrl: string; // URL file mp3 cho section này
   groups: QuestionGroup[];
 }
@@ -58,7 +59,7 @@ export interface WritingTask {
   title: string; // Vd: "Writing Task 1"
   prompt: string; // HTML đề bài
   imageUrl?: string; // Dùng cho Task 1 (Biểu đồ/Map)
-  minWords: number; // Vd: 150 hoặc 250
+  minWords?: number; // Vd: 150 hoặc 250
 }
 
 // --- SPEAKING (Mới) ---
@@ -66,15 +67,26 @@ export interface SpeakingPart {
   id: number;
   partNumber: 1 | 2 | 3;
   title: string; // Vd: "Part 1: Introduction"
+  description?: string; // Optional description of the part
   questions: string[]; // Danh sách câu hỏi gợi ý
   preparationTime?: number; // Cho Part 2 (60 giây)
+  speakingTime?: number; // Max speaking time in seconds
+}
+
+// --- SKILL DURATIONS (seconds) ---
+export interface SkillDurations {
+  reading?: number; // Default: 3600 (60 minutes)
+  listening?: number; // Default: 2400 (40 minutes)
+  writing?: number; // Default: 3600 (60 minutes)
+  speaking?: number; // Default: 900 (15 minutes)
 }
 
 // --- ROOT DATA STRUCTURE ---
 export interface ExamData {
   id: number;
   title: string;
-  duration: number; // Tổng thời gian (nếu cần)
+  duration?: number; // Tổng thời gian (deprecated, dùng durations thay thế)
+  durations?: SkillDurations; // Thời gian cho từng skill
 
   // 4 kỹ năng có thể có hoặc null (nếu bài thi lẻ)
   reading?: ReadingPassage[];
@@ -139,21 +151,35 @@ export const getNextSkill = (
 };
 
 /**
- * Get default duration for a skill (in seconds)
+ * Default durations for each skill (in seconds)
  */
-export const getSkillDuration = (skill: SkillType): number => {
-  switch (skill) {
-    case "READING":
-      return 60 * 60; // 60 minutes
-    case "LISTENING":
-      return 40 * 60; // 40 minutes
-    case "WRITING":
-      return 60 * 60; // 60 minutes
-    case "SPEAKING":
-      return 15 * 60; // 15 minutes
-    default:
-      return 60 * 60;
+export const DEFAULT_SKILL_DURATIONS: Record<SkillType, number> = {
+  READING: 60 * 60, // 60 minutes
+  LISTENING: 40 * 60, // 40 minutes
+  WRITING: 60 * 60, // 60 minutes
+  SPEAKING: 15 * 60, // 15 minutes
+};
+
+/**
+ * Get duration for a skill from examData or use default
+ * @param skill - The skill type
+ * @param examData - Optional exam data with custom durations
+ */
+export const getSkillDuration = (
+  skill: SkillType,
+  examData?: ExamData | null
+): number => {
+  // 1. Try to get from examData.durations
+  if (examData?.durations) {
+    const skillKey = skill.toLowerCase() as keyof SkillDurations;
+    const customDuration = examData.durations[skillKey];
+    if (customDuration && customDuration > 0) {
+      return customDuration;
+    }
   }
+
+  // 2. Fallback to default durations
+  return DEFAULT_SKILL_DURATIONS[skill];
 };
 
 /**

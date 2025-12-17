@@ -25,14 +25,31 @@ import {
 import { useExamStore } from "../store/examStore";
 import styles from "./ResultPage.module.css";
 import type { MoodleConfig } from "../types";
-import { getAvailableSkills, hasSkillData } from "../types";
+import { hasSkillData } from "../types";
 
 interface ResultPageProps {
   config?: MoodleConfig;
 }
 
 const ResultPage = ({ config }: ResultPageProps) => {
-  const { answers, writingEssays, speakingAudio, examData } = useExamStore();
+  const { answers, writingEssays, speakingAudio, examData, timeTaken } =
+    useExamStore();
+
+  // Format time taken for display
+  const formatTimeTaken = (seconds: number | null): string => {
+    if (seconds === null) return "N/A";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
+  };
 
   // Determine first available skill for default tab
   const getFirstAvailableSkill = ():
@@ -236,8 +253,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
     return 2.0;
   };
 
-  // Get available skills for this exam
-  const availableSkills = useMemo(() => getAvailableSkills(exam), [exam]);
+  // Note: availableSkills removed - we now show all skills but indicate pending grading
 
   // Calculate band scores only for available skills
   const readingScore = hasSkillData(exam, "READING")
@@ -247,7 +263,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
     ? convertToListeningBand(listeningResult.correct)
     : null;
 
-  // Writing score (based on word count achievement - simplified)
+  // Word count function for writing stats display
   const countWords = (text: string): number => {
     if (!text) return 0;
     const trimmed = text.trim();
@@ -258,31 +274,23 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
   const task1Words = countWords(writingEssays[1] || "");
   const task2Words = countWords(writingEssays[2] || "");
-  const writingScore = hasSkillData(exam, "WRITING")
-    ? task1Words >= 150 && task2Words >= 250
-      ? 7.0
-      : task1Words >= 100 && task2Words >= 200
-      ? 6.0
-      : 5.0
-    : null;
 
-  // Speaking score (based on recording presence - simplified)
+  // Writing & Speaking scores are NOT calculated automatically
+  // They require teacher grading - displayed as "Pending" in UI
+
+  // Check if recordings exist for speaking
   const hasRecordings = Object.keys(speakingAudio).length > 0;
-  const speakingScore = hasSkillData(exam, "SPEAKING")
-    ? hasRecordings
-      ? 6.5
-      : 0
-    : null;
 
-  // Calculate overall band score dynamically based on available skills
+  // Calculate overall band score based on auto-graded skills only (Reading & Listening)
+  // Writing & Speaking require teacher grading and are excluded
   const calculateOverallScore = (): string => {
     const scores: number[] = [];
+    // Only include auto-graded skills (Reading & Listening)
     if (readingScore !== null) scores.push(readingScore);
     if (listeningScore !== null) scores.push(listeningScore);
-    if (writingScore !== null) scores.push(writingScore);
-    if (speakingScore !== null) scores.push(speakingScore);
+    // Writing & Speaking are excluded - require teacher grading
 
-    if (scores.length === 0) return "0.0";
+    if (scores.length === 0) return "-";
 
     const sum = scores.reduce((acc, score) => acc + score, 0);
     const average = sum / scores.length;
@@ -479,15 +487,22 @@ const ResultPage = ({ config }: ResultPageProps) => {
                     </div>
 
                     <div className={styles.answerFeedback}>
-                      <span
-                        className={`${styles.answerLabel} ${
-                          isCorrect
-                            ? styles.correctLabel
-                            : styles.incorrectLabel
-                        }`}
-                      >
-                        {q.id} Answer: <strong>{correctAns}</strong>
-                      </span>
+                      <div className={styles.answerComparison}>
+                        <span className={styles.yourAnswer}>
+                          Your answer:{" "}
+                          <strong>{userAns || "(no answer)"}</strong>
+                        </span>
+                        <span
+                          className={`${styles.answerLabel} ${
+                            isCorrect
+                              ? styles.correctLabel
+                              : styles.incorrectLabel
+                          }`}
+                        >
+                          Correct: <strong>{correctAns}</strong>
+                          {isCorrect ? " ✓" : " ✗"}
+                        </span>
+                      </div>
 
                       <div className={styles.actionBtns}>
                         <Tooltip title="Locate in passage">
@@ -635,20 +650,22 @@ const ResultPage = ({ config }: ResultPageProps) => {
                     </div>
 
                     <div className={styles.answerFeedback}>
-                      <span
-                        className={`${styles.answerLabel} ${
-                          isCorrect
-                            ? styles.correctLabel
-                            : styles.incorrectLabel
-                        }`}
-                      >
-                        {q.id} Answer: <strong>{correctAns}</strong>
-                      </span>
-                      {userAns && !isCorrect && (
+                      <div className={styles.answerComparison}>
                         <span className={styles.yourAnswer}>
-                          Your answer: <strong>{userAns}</strong>
+                          Your answer:{" "}
+                          <strong>{userAns || "(no answer)"}</strong>
                         </span>
-                      )}
+                        <span
+                          className={`${styles.answerLabel} ${
+                            isCorrect
+                              ? styles.correctLabel
+                              : styles.incorrectLabel
+                          }`}
+                        >
+                          Correct: <strong>{correctAns}</strong>
+                          {isCorrect ? " ✓" : " ✗"}
+                        </span>
+                      </div>
 
                       <div className={styles.actionBtns}>
                         <Tooltip title="Listen to section">
@@ -902,9 +919,18 @@ const ResultPage = ({ config }: ResultPageProps) => {
             {getBandDescription(parseFloat(overallScore))}
           </div>
           <div style={{ fontSize: "12px", color: "#888", marginTop: "8px" }}>
-            Based on {availableSkills.length} skill(s):{" "}
-            {availableSkills.join(", ")}
+            {hasSkillData(exam, "READING") || hasSkillData(exam, "LISTENING")
+              ? "Based on Reading & Listening (auto-graded)"
+              : "Awaiting teacher grading"}
           </div>
+          {(hasSkillData(exam, "WRITING") ||
+            hasSkillData(exam, "SPEAKING")) && (
+            <div
+              style={{ fontSize: "11px", color: "#f59e0b", marginTop: "4px" }}
+            >
+              Writing & Speaking scores pending teacher review
+            </div>
+          )}
         </div>
 
         {/* Skill Scores - Only show available skills */}
@@ -945,11 +971,20 @@ const ResultPage = ({ config }: ResultPageProps) => {
                 <EditOutlined />
               </div>
               <div className={styles.skillName}>Writing</div>
-              <div className={styles.skillScore}>
-                {writingScore?.toFixed(1) ?? "-"}
+              <div
+                className={styles.skillScore}
+                style={{ fontSize: "18px", color: "#f59e0b" }}
+              >
+                Pending
               </div>
               <div className={styles.skillDetails}>
                 T1: {task1Words}w • T2: {task2Words}w
+              </div>
+              <div
+                className={styles.skillDetails}
+                style={{ fontSize: "11px", color: "#888" }}
+              >
+                Awaiting teacher grading
               </div>
             </div>
           )}
@@ -960,15 +995,22 @@ const ResultPage = ({ config }: ResultPageProps) => {
                 <AudioOutlined />
               </div>
               <div className={styles.skillName}>Speaking</div>
-              <div className={styles.skillScore}>
-                {speakingScore !== null && speakingScore > 0
-                  ? speakingScore.toFixed(1)
-                  : "-"}
+              <div
+                className={styles.skillScore}
+                style={{ fontSize: "18px", color: "#f59e0b" }}
+              >
+                Pending
               </div>
               <div className={styles.skillDetails}>
                 {hasRecordings
-                  ? `${Object.keys(speakingAudio).length}/3 parts`
+                  ? `${Object.keys(speakingAudio).length}/3 parts recorded`
                   : "Not recorded"}
+              </div>
+              <div
+                className={styles.skillDetails}
+                style={{ fontSize: "11px", color: "#888" }}
+              >
+                Awaiting teacher grading
               </div>
             </div>
           )}
@@ -995,7 +1037,9 @@ const ResultPage = ({ config }: ResultPageProps) => {
               </div>
               <div className={styles.statInfo}>
                 <div className={styles.statLabel}>Time Taken</div>
-                <div className={styles.statValue}>~60 min</div>
+                <div className={styles.statValue}>
+                  {formatTimeTaken(timeTaken)}
+                </div>
               </div>
             </div>
 
