@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useMemo } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Layout, Button, Spin, Modal, message } from "antd";
 import {
@@ -18,7 +18,8 @@ import {
   ResultPage,
 } from "./lazyComponents";
 import styles from "../App.module.css";
-import type { MoodleConfig } from "../types";
+import type { MoodleConfig, SkillType } from "../types";
+import { getAvailableSkills, getNextSkill, getSkillDuration } from "../types";
 
 const { Header, Content, Footer } = Layout;
 
@@ -51,6 +52,18 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
 
   const [loading, setLoading] = useState(true);
 
+  // Get available skills from exam data
+  const availableSkills = useMemo(
+    () => getAvailableSkills(examData),
+    [examData]
+  );
+
+  // Check if current skill is the last available skill
+  const isLastSkill = useMemo(() => {
+    if (availableSkills.length === 0) return true;
+    return availableSkills.indexOf(currentSkill) === availableSkills.length - 1;
+  }, [availableSkills, currentSkill]);
+
   // 1. INIT: Load exam data from API
   useEffect(() => {
     const initExam = async () => {
@@ -66,7 +79,18 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     initExam();
   }, [loadExam]);
 
-  // 2. TIMER: Countdown
+  // 2. Set initial skill to first available skill
+  useEffect(() => {
+    if (loading || !examData || availableSkills.length === 0) return;
+
+    // If current skill is not available in this exam, switch to first available
+    if (!availableSkills.includes(currentSkill)) {
+      const firstSkill = availableSkills[0];
+      setSkill(firstSkill, getSkillDuration(firstSkill));
+    }
+  }, [loading, examData, availableSkills, currentSkill, setSkill]);
+
+  // 3. TIMER: Countdown
   useEffect(() => {
     if (loading || isSubmitted) return;
 
@@ -81,42 +105,38 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     return () => clearInterval(timer);
   }, [timeLeft, loading, isSubmitted, tickTimer]);
 
-  // Navigate based on current skill
+  // Navigate based on current skill (only if skill is available)
   useEffect(() => {
     if (loading || isSubmitted) return;
+    if (!availableSkills.includes(currentSkill)) return;
 
-    const routeMap = {
+    const routeMap: Record<SkillType, string> = {
       READING: ROUTES.READING,
       LISTENING: ROUTES.LISTENING,
       WRITING: ROUTES.WRITING,
       SPEAKING: ROUTES.SPEAKING,
     };
 
-    const targetRoute = routeMap[currentSkill as keyof typeof routeMap];
+    const targetRoute = routeMap[currentSkill];
     if (targetRoute) {
       navigate(targetRoute, { replace: true });
     }
-  }, [currentSkill, loading, isSubmitted, navigate]);
+  }, [currentSkill, loading, isSubmitted, navigate, availableSkills]);
 
   const handleTimeOut = () => {
     message.warning("Time's up for this section!");
     handleNextSkill();
   };
 
+  // Dynamic skill navigation based on available skills
   const handleNextSkill = () => {
-    switch (currentSkill) {
-      case "READING":
-        setSkill("LISTENING", 40 * 60);
-        break;
-      case "LISTENING":
-        setSkill("WRITING", 60 * 60);
-        break;
-      case "WRITING":
-        setSkill("SPEAKING", 15 * 60);
-        break;
-      case "SPEAKING":
-        handleSubmit();
-        break;
+    const nextSkill = getNextSkill(currentSkill, availableSkills);
+
+    if (nextSkill) {
+      setSkill(nextSkill, getSkillDuration(nextSkill));
+    } else {
+      // No more skills, submit the exam
+      handleSubmit();
     }
   };
 
@@ -327,10 +347,16 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
           <div className={styles.footerLeft}>
             Current Section:
             <span className={styles.footerCurrentSkill}>{currentSkill}</span>
+            <span
+              style={{ marginLeft: "16px", color: "#666", fontSize: "13px" }}
+            >
+              ({availableSkills.indexOf(currentSkill) + 1} /{" "}
+              {availableSkills.length})
+            </span>
           </div>
 
           <div className={styles.footerRight}>
-            {currentSkill !== "SPEAKING" ? (
+            {!isLastSkill ? (
               <Button
                 type="primary"
                 icon={<RightOutlined />}

@@ -25,6 +25,7 @@ import {
 import { useExamStore } from "../store/examStore";
 import styles from "./ResultPage.module.css";
 import type { MoodleConfig } from "../types";
+import { getAvailableSkills, hasSkillData } from "../types";
 
 interface ResultPageProps {
   config?: MoodleConfig;
@@ -32,9 +33,23 @@ interface ResultPageProps {
 
 const ResultPage = ({ config }: ResultPageProps) => {
   const { answers, writingEssays, speakingAudio, examData } = useExamStore();
+
+  // Determine first available skill for default tab
+  const getFirstAvailableSkill = ():
+    | "reading"
+    | "listening"
+    | "writing"
+    | "speaking" => {
+    if (examData?.reading?.length) return "reading";
+    if (examData?.listening?.length) return "listening";
+    if (examData?.writing?.length) return "writing";
+    if (examData?.speaking?.length) return "speaking";
+    return "reading"; // Fallback
+  };
+
   const [activeReviewTab, setActiveReviewTab] = useState<
     "reading" | "listening" | "writing" | "speaking"
-  >("reading");
+  >(getFirstAvailableSkill());
   const [playingAudio, setPlayingAudio] = useState<number | null>(null);
   const [activeReadingPart, setActiveReadingPart] = useState(0);
   const [activeListeningPart, setActiveListeningPart] = useState(0);
@@ -221,9 +236,16 @@ const ResultPage = ({ config }: ResultPageProps) => {
     return 2.0;
   };
 
-  // Calculate band scores
-  const readingScore = convertToReadingBand(readingResult.correct);
-  const listeningScore = convertToListeningBand(listeningResult.correct);
+  // Get available skills for this exam
+  const availableSkills = useMemo(() => getAvailableSkills(exam), [exam]);
+
+  // Calculate band scores only for available skills
+  const readingScore = hasSkillData(exam, "READING")
+    ? convertToReadingBand(readingResult.correct)
+    : null;
+  const listeningScore = hasSkillData(exam, "LISTENING")
+    ? convertToListeningBand(listeningResult.correct)
+    : null;
 
   // Writing score (based on word count achievement - simplified)
   const countWords = (text: string): number => {
@@ -236,22 +258,41 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
   const task1Words = countWords(writingEssays[1] || "");
   const task2Words = countWords(writingEssays[2] || "");
-  const writingScore =
-    task1Words >= 150 && task2Words >= 250
+  const writingScore = hasSkillData(exam, "WRITING")
+    ? task1Words >= 150 && task2Words >= 250
       ? 7.0
       : task1Words >= 100 && task2Words >= 200
       ? 6.0
-      : 5.0;
+      : 5.0
+    : null;
 
   // Speaking score (based on recording presence - simplified)
   const hasRecordings = Object.keys(speakingAudio).length > 0;
-  const speakingScore = hasRecordings ? 6.5 : 0;
+  const speakingScore = hasSkillData(exam, "SPEAKING")
+    ? hasRecordings
+      ? 6.5
+      : 0
+    : null;
 
-  // Overall band score
-  const overallScore = (
-    (readingScore + listeningScore + writingScore + speakingScore) /
-    4
-  ).toFixed(1);
+  // Calculate overall band score dynamically based on available skills
+  const calculateOverallScore = (): string => {
+    const scores: number[] = [];
+    if (readingScore !== null) scores.push(readingScore);
+    if (listeningScore !== null) scores.push(listeningScore);
+    if (writingScore !== null) scores.push(writingScore);
+    if (speakingScore !== null) scores.push(speakingScore);
+
+    if (scores.length === 0) return "0.0";
+
+    const sum = scores.reduce((acc, score) => acc + score, 0);
+    const average = sum / scores.length;
+
+    // Round to nearest 0.5 (IELTS standard)
+    const rounded = Math.round(average * 2) / 2;
+    return rounded.toFixed(1);
+  };
+
+  const overallScore = calculateOverallScore();
 
   // Get band description
   const getBandDescription = (score: number): string => {
@@ -860,129 +901,161 @@ const ResultPage = ({ config }: ResultPageProps) => {
           <div className={styles.overallDescription}>
             {getBandDescription(parseFloat(overallScore))}
           </div>
+          <div style={{ fontSize: "12px", color: "#888", marginTop: "8px" }}>
+            Based on {availableSkills.length} skill(s):{" "}
+            {availableSkills.join(", ")}
+          </div>
         </div>
 
-        {/* Skill Scores */}
+        {/* Skill Scores - Only show available skills */}
         <div className={styles.skillScoresGrid}>
-          <div className={styles.skillCard}>
-            <div className={`${styles.skillIcon} ${styles.reading}`}>
-              <BookOutlined />
+          {hasSkillData(exam, "READING") && (
+            <div className={styles.skillCard}>
+              <div className={`${styles.skillIcon} ${styles.reading}`}>
+                <BookOutlined />
+              </div>
+              <div className={styles.skillName}>Reading</div>
+              <div className={styles.skillScore}>
+                {readingScore?.toFixed(1) ?? "-"}
+              </div>
+              <div className={styles.skillDetails}>
+                {readingResult.correct}/{readingResult.total} correct
+              </div>
             </div>
-            <div className={styles.skillName}>Reading</div>
-            <div className={styles.skillScore}>{readingScore.toFixed(1)}</div>
-            <div className={styles.skillDetails}>
-              {correctCount}/{totalQuestions} correct
-            </div>
-          </div>
+          )}
 
-          <div className={styles.skillCard}>
-            <div className={`${styles.skillIcon} ${styles.listening}`}>
-              <SoundOutlined />
+          {hasSkillData(exam, "LISTENING") && (
+            <div className={styles.skillCard}>
+              <div className={`${styles.skillIcon} ${styles.listening}`}>
+                <SoundOutlined />
+              </div>
+              <div className={styles.skillName}>Listening</div>
+              <div className={styles.skillScore}>
+                {listeningScore?.toFixed(1) ?? "-"}
+              </div>
+              <div className={styles.skillDetails}>
+                {listeningResult.correct}/{listeningResult.total} correct
+              </div>
             </div>
-            <div className={styles.skillName}>Listening</div>
-            <div className={styles.skillScore}>{listeningScore.toFixed(1)}</div>
-            <div className={styles.skillDetails}>Estimated</div>
-          </div>
+          )}
 
-          <div className={styles.skillCard}>
-            <div className={`${styles.skillIcon} ${styles.writing}`}>
-              <EditOutlined />
+          {hasSkillData(exam, "WRITING") && (
+            <div className={styles.skillCard}>
+              <div className={`${styles.skillIcon} ${styles.writing}`}>
+                <EditOutlined />
+              </div>
+              <div className={styles.skillName}>Writing</div>
+              <div className={styles.skillScore}>
+                {writingScore?.toFixed(1) ?? "-"}
+              </div>
+              <div className={styles.skillDetails}>
+                T1: {task1Words}w • T2: {task2Words}w
+              </div>
             </div>
-            <div className={styles.skillName}>Writing</div>
-            <div className={styles.skillScore}>{writingScore.toFixed(1)}</div>
-            <div className={styles.skillDetails}>
-              T1: {task1Words}w • T2: {task2Words}w
-            </div>
-          </div>
+          )}
 
-          <div className={styles.skillCard}>
-            <div className={`${styles.skillIcon} ${styles.speaking}`}>
-              <AudioOutlined />
+          {hasSkillData(exam, "SPEAKING") && (
+            <div className={styles.skillCard}>
+              <div className={`${styles.skillIcon} ${styles.speaking}`}>
+                <AudioOutlined />
+              </div>
+              <div className={styles.skillName}>Speaking</div>
+              <div className={styles.skillScore}>
+                {speakingScore !== null && speakingScore > 0
+                  ? speakingScore.toFixed(1)
+                  : "-"}
+              </div>
+              <div className={styles.skillDetails}>
+                {hasRecordings
+                  ? `${Object.keys(speakingAudio).length}/3 parts`
+                  : "Not recorded"}
+              </div>
             </div>
-            <div className={styles.skillName}>Speaking</div>
-            <div className={styles.skillScore}>
-              {speakingScore > 0 ? speakingScore.toFixed(1) : "-"}
-            </div>
-            <div className={styles.skillDetails}>
-              {hasRecordings
-                ? `${Object.keys(speakingAudio).length}/3 parts`
-                : "Not recorded"}
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Stats Row */}
-        <div className={styles.statsRow}>
-          <div className={styles.statCard}>
-            <div className={`${styles.statIcon} ${styles.correct}`}>
-              <CheckCircleOutlined />
+        {/* Stats Row - Only show if there are objective questions */}
+        {(hasSkillData(exam, "READING") || hasSkillData(exam, "LISTENING")) && (
+          <div className={styles.statsRow}>
+            <div className={styles.statCard}>
+              <div className={`${styles.statIcon} ${styles.correct}`}>
+                <CheckCircleOutlined />
+              </div>
+              <div className={styles.statInfo}>
+                <div className={styles.statLabel}>Total Correct</div>
+                <div className={styles.statValue}>
+                  {correctCount}/{totalQuestions}
+                </div>
+              </div>
             </div>
-            <div className={styles.statInfo}>
-              <div className={styles.statLabel}>Total Correct</div>
-              <div className={styles.statValue}>
-                {correctCount}/{totalQuestions}
+
+            <div className={styles.statCard}>
+              <div className={`${styles.statIcon} ${styles.time}`}>
+                <ClockCircleOutlined />
+              </div>
+              <div className={styles.statInfo}>
+                <div className={styles.statLabel}>Time Taken</div>
+                <div className={styles.statValue}>~60 min</div>
+              </div>
+            </div>
+
+            <div className={styles.statCard}>
+              <div className={`${styles.statIcon} ${styles.accuracy}`}>
+                <PercentageOutlined />
+              </div>
+              <div className={styles.statInfo}>
+                <div className={styles.statLabel}>Accuracy</div>
+                <div className={styles.statValue}>{accuracy}%</div>
               </div>
             </div>
           </div>
-
-          <div className={styles.statCard}>
-            <div className={`${styles.statIcon} ${styles.time}`}>
-              <ClockCircleOutlined />
-            </div>
-            <div className={styles.statInfo}>
-              <div className={styles.statLabel}>Time Taken</div>
-              <div className={styles.statValue}>~60 min</div>
-            </div>
-          </div>
-
-          <div className={styles.statCard}>
-            <div className={`${styles.statIcon} ${styles.accuracy}`}>
-              <PercentageOutlined />
-            </div>
-            <div className={styles.statInfo}>
-              <div className={styles.statLabel}>Accuracy</div>
-              <div className={styles.statValue}>{accuracy}%</div>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Review Section */}
         <div className={styles.reviewSection}>
           <div className={styles.reviewHeader}>
             <h2 className={styles.reviewTitle}>Detailed Review</h2>
             <div className={styles.reviewTabs}>
-              <button
-                className={`${styles.reviewTab} ${
-                  activeReviewTab === "reading" ? styles.active : ""
-                }`}
-                onClick={() => setActiveReviewTab("reading")}
-              >
-                <BookOutlined /> Reading
-              </button>
-              <button
-                className={`${styles.reviewTab} ${
-                  activeReviewTab === "listening" ? styles.active : ""
-                }`}
-                onClick={() => setActiveReviewTab("listening")}
-              >
-                <SoundOutlined /> Listening
-              </button>
-              <button
-                className={`${styles.reviewTab} ${
-                  activeReviewTab === "writing" ? styles.active : ""
-                }`}
-                onClick={() => setActiveReviewTab("writing")}
-              >
-                <EditOutlined /> Writing
-              </button>
-              <button
-                className={`${styles.reviewTab} ${
-                  activeReviewTab === "speaking" ? styles.active : ""
-                }`}
-                onClick={() => setActiveReviewTab("speaking")}
-              >
-                <AudioOutlined /> Speaking
-              </button>
+              {hasSkillData(exam, "READING") && (
+                <button
+                  className={`${styles.reviewTab} ${
+                    activeReviewTab === "reading" ? styles.active : ""
+                  }`}
+                  onClick={() => setActiveReviewTab("reading")}
+                >
+                  <BookOutlined /> Reading
+                </button>
+              )}
+              {hasSkillData(exam, "LISTENING") && (
+                <button
+                  className={`${styles.reviewTab} ${
+                    activeReviewTab === "listening" ? styles.active : ""
+                  }`}
+                  onClick={() => setActiveReviewTab("listening")}
+                >
+                  <SoundOutlined /> Listening
+                </button>
+              )}
+              {hasSkillData(exam, "WRITING") && (
+                <button
+                  className={`${styles.reviewTab} ${
+                    activeReviewTab === "writing" ? styles.active : ""
+                  }`}
+                  onClick={() => setActiveReviewTab("writing")}
+                >
+                  <EditOutlined /> Writing
+                </button>
+              )}
+              {hasSkillData(exam, "SPEAKING") && (
+                <button
+                  className={`${styles.reviewTab} ${
+                    activeReviewTab === "speaking" ? styles.active : ""
+                  }`}
+                  onClick={() => setActiveReviewTab("speaking")}
+                >
+                  <AudioOutlined /> Speaking
+                </button>
+              )}
             </div>
           </div>
 

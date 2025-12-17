@@ -1,41 +1,21 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+// FILE: local/ielts/db/seed.php
 
-/**
- * Seed script to populate IELTS exam data.
- *
- * Run this script via CLI: php local/ielts/db/seed.php
- * Or access via browser when logged in as admin.
- *
- * @package    local_ielts
- * @copyright  2024 Your Name
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
+// 1. Đặt mode là AJAX để chạy được trên trình duyệt
+define('AJAX_SCRIPT', true);
 
-define('CLI_SCRIPT', true);
-
+// 2. Load config Moodle (Lùi ra 3 cấp thư mục: db -> ielts -> local -> root)
 require_once(__DIR__ . '/../../../config.php');
-require_once($CFG->libdir . '/clilib.php');
 
-// Ensure only admin can run this.
-if (!is_siteadmin()) {
-    cli_error('Only administrators can run this script.');
-}
+// 3. Bắt buộc đăng nhập Admin
+require_login();
+require_capability('moodle/site:config', context_system::instance());
 
+// Thiết lập output
+header('Content-Type: text/html; charset=utf-8');
 global $DB;
+
+echo "<h1>Starting IELTS Exam Seeding...</h1><hr>";
 
 // ============================================================
 // MOCK DATA - IELTS Full Mock Test 01 (Academic)
@@ -367,16 +347,21 @@ $exam_data = [
 ];
 
 // ============================================================
-// INSERT DATA INTO DATABASE
+// INSERT / UPDATE LOGIC
 // ============================================================
 
 $now = time();
 
-// Check if exam already exists.
+// Helper function để in ra trình duyệt
+function web_log($msg, $color = 'black') {
+    echo "<div style='color: {$color}; margin-bottom: 5px;'>{$msg}</div>";
+    flush(); // Đẩy output ra ngay lập tức
+}
+
+// 1. Process Main Exam
 $existing = $DB->get_record('local_ielts_exams', ['name' => $exam_data['title']]);
 
 if ($existing) {
-    // Update existing record.
     $record = new stdClass();
     $record->id = $existing->id;
     $record->name = $exam_data['title'];
@@ -384,56 +369,37 @@ if ($existing) {
     $record->timemodified = $now;
 
     $DB->update_record('local_ielts_exams', $record);
-    cli_writeln("Updated exam: {$exam_data['title']} (ID: {$existing->id})");
+    web_log("Updated FULL exam: <b>{$exam_data['title']}</b> (ID: {$existing->id})", 'green');
 } else {
-    // Insert new record.
     $record = new stdClass();
     $record->name = $exam_data['title'];
     $record->content_json = json_encode($exam_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     $record->timecreated = $now;
     $record->timemodified = $now;
 
-    $id = $DB->insert_record('local_ielts_exams', $record);
-    cli_writeln("Inserted exam: {$exam_data['title']} (ID: {$id})");
+    // Cố gắng ép ID = 1 nếu chưa có (để React dễ gọi)
+    if (!$DB->record_exists('local_ielts_exams', ['id' => 1])) {
+        $record->id = 1;
+        $id = $DB->insert_record_raw('local_ielts_exams', $record); // Dùng raw để ép ID
+    } else {
+        $id = $DB->insert_record('local_ielts_exams', $record);
+    }
+    
+    web_log("Inserted FULL exam: <b>{$exam_data['title']}</b> (ID: {$id})", 'blue');
 }
 
-// ============================================================
-// ADDITIONAL EXAM DATA - Individual Skills (Optional)
-// ============================================================
-
-// Reading Only Exam
-$reading_exam = [
-    'id' => 2,
-    'title' => 'IELTS Reading Practice Test 01',
-    'duration' => 3600, // 60 minutes
-    'reading' => $exam_data['reading'],
+// 2. Process Individual Skill Exams
+$skill_exams = [
+    [
+        'id' => 2, 'title' => 'IELTS Reading Practice Test 01', 'duration' => 3600,
+        'reading' => $exam_data['reading']
+    ],
+    [
+        'id' => 3, 'title' => 'IELTS Listening Practice Test 01', 'duration' => 2400,
+        'listening' => $exam_data['listening']
+    ],
+    // Thêm các skill khác nếu cần...
 ];
-
-// Listening Only Exam
-$listening_exam = [
-    'id' => 3,
-    'title' => 'IELTS Listening Practice Test 01',
-    'duration' => 2400, // 40 minutes
-    'listening' => $exam_data['listening'],
-];
-
-// Writing Only Exam
-$writing_exam = [
-    'id' => 4,
-    'title' => 'IELTS Writing Practice Test 01',
-    'duration' => 3600, // 60 minutes
-    'writing' => $exam_data['writing'],
-];
-
-// Speaking Only Exam
-$speaking_exam = [
-    'id' => 5,
-    'title' => 'IELTS Speaking Practice Test 01',
-    'duration' => 900, // 15 minutes
-    'speaking' => $exam_data['speaking'],
-];
-
-$skill_exams = [$reading_exam, $listening_exam, $writing_exam, $speaking_exam];
 
 foreach ($skill_exams as $exam) {
     $existing = $DB->get_record('local_ielts_exams', ['name' => $exam['title']]);
@@ -441,26 +407,20 @@ foreach ($skill_exams as $exam) {
     if ($existing) {
         $record = new stdClass();
         $record->id = $existing->id;
-        $record->name = $exam['title'];
-        $record->content_json = json_encode($exam, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $record->content_json = json_encode($exam, JSON_UNESCAPED_UNICODE);
         $record->timemodified = $now;
-
         $DB->update_record('local_ielts_exams', $record);
-        cli_writeln("Updated exam: {$exam['title']} (ID: {$existing->id})");
+        web_log("Updated skill exam: {$exam['title']}", 'green');
     } else {
         $record = new stdClass();
         $record->name = $exam['title'];
-        $record->content_json = json_encode($exam, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $record->content_json = json_encode($exam, JSON_UNESCAPED_UNICODE);
         $record->timecreated = $now;
         $record->timemodified = $now;
-
-        $id = $DB->insert_record('local_ielts_exams', $record);
-        cli_writeln("Inserted exam: {$exam['title']} (ID: {$id})");
+        $DB->insert_record('local_ielts_exams', $record);
+        web_log("Inserted skill exam: {$exam['title']}", 'blue');
     }
 }
 
-cli_writeln('');
-cli_writeln('===========================================');
-cli_writeln('Seeding completed successfully!');
-cli_writeln('Total exams: 5 (1 full + 4 individual skills)');
-cli_writeln('===========================================');
+echo "<hr><h3>✅ Seeding completed successfully!</h3>";
+echo "<p><a href='../../index.php'>Go back to Plugin Page</a></p>";

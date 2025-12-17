@@ -95,3 +95,86 @@ export interface WritingSubmissions {
 export interface SpeakingSubmissions {
   [partId: number]: Blob; // Lưu file ghi âm (Blob audio)
 }
+
+// --- HELPER FUNCTIONS ---
+
+/**
+ * Get list of available skills in an exam
+ * Returns array of skill types that have data
+ */
+export const getAvailableSkills = (examData: ExamData | null): SkillType[] => {
+  if (!examData) return [];
+
+  const skills: SkillType[] = [];
+
+  if (examData.reading && examData.reading.length > 0) {
+    skills.push("READING");
+  }
+  if (examData.listening && examData.listening.length > 0) {
+    skills.push("LISTENING");
+  }
+  if (examData.writing && examData.writing.length > 0) {
+    skills.push("WRITING");
+  }
+  if (examData.speaking && examData.speaking.length > 0) {
+    skills.push("SPEAKING");
+  }
+
+  return skills;
+};
+
+/**
+ * Get the next skill in sequence based on available skills
+ * Returns null if current skill is the last one
+ */
+export const getNextSkill = (
+  currentSkill: SkillType,
+  availableSkills: SkillType[]
+): SkillType | null => {
+  const currentIndex = availableSkills.indexOf(currentSkill);
+  if (currentIndex === -1 || currentIndex === availableSkills.length - 1) {
+    return null; // Last skill or not found
+  }
+  return availableSkills[currentIndex + 1];
+};
+
+/**
+ * Get default duration for a skill (in seconds)
+ */
+export const getSkillDuration = (skill: SkillType): number => {
+  switch (skill) {
+    case "READING":
+      return 60 * 60; // 60 minutes
+    case "LISTENING":
+      return 40 * 60; // 40 minutes
+    case "WRITING":
+      return 60 * 60; // 60 minutes
+    case "SPEAKING":
+      return 15 * 60; // 15 minutes
+    default:
+      return 60 * 60;
+  }
+};
+
+/**
+ * Check if a skill has data in the exam
+ */
+export const hasSkillData = (
+  examData: ExamData | null,
+  skill: SkillType
+): boolean => {
+  if (!examData) return false;
+
+  switch (skill) {
+    case "READING":
+      return !!(examData.reading && examData.reading.length > 0);
+    case "LISTENING":
+      return !!(examData.listening && examData.listening.length > 0);
+    case "WRITING":
+      return !!(examData.writing && examData.writing.length > 0);
+    case "SPEAKING":
+      return !!(examData.speaking && examData.speaking.length > 0);
+    default:
+      return false;
+  }
+};

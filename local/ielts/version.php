@@ -7,7 +7,7 @@ defined('MOODLE_INTERNAL') || die();
 $plugin->component = 'local_ielts';
 
 // 2. Phiên bản của plugin
-$plugin->version = 2025121700;
+$plugin->version = 2025121702;
 
 // 3. Yêu cầu phiên bản Moodle tối thiểu
 $plugin->requires = 2022112800;
