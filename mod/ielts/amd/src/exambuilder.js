@@ -1,0 +1,1364 @@
+/**
+ * IELTS Exam Builder - AMD module for dynamic form building
+ *
+ * @module     mod_ielts/exambuilder
+ * @copyright  2025 Your Name
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+define([
+  "jquery",
+  "core/str",
+  "core/notification",
+  "core/templates",
+  "core/ajax",
+], function ($, Str, Notification, Templates, Ajax) {
+  // Store editor instances
+  let editorInstances = {};
+
+  // Data storage
+  let examData = {
+    id: 1,
+    title: "",
+    durations: {
+      reading: 3600,
+      listening: 2400,
+      writing: 3600,
+      speaking: 900,
+    },
+    reading: [],
+    listening: [],
+    writing: [],
+    speaking: [],
+  };
+
+  // Counter for unique IDs
+  let idCounters = {
+    passage: 1,
+    group: 1,
+    question: 1,
+    section: 1,
+    task: 1,
+    part: 1,
+  };
+
+  // Question types
+  const questionTypes = [
+    { value: "MULTIPLE_CHOICE", label: "Multiple Choice" },
+    { value: "TRUE_FALSE", label: "True/False/Not Given" },
+    { value: "GAP_FILL", label: "Gap Fill" },
+    { value: "MATCHING", label: "Matching" },
+    { value: "MAP_LABELING", label: "Map Labeling" },
+  ];
+
+  /**
+   * Initialize the exam builder
+   */
+  function init() {
+    console.log("IELTS Exam Builder initialized");
+
+    // Bind skill checkbox events
+    bindSkillCheckboxes();
+
+    // Bind add buttons
+    bindAddButtons();
+
+    // Bind input method change
+    bindInputMethodChange();
+
+    // Bind form submission
+    bindFormSubmission();
+
+    // Load existing data if available
+    loadExistingData();
+
+    // Initial visibility update
+    updateSkillSections();
+  }
+
+  /**
+   * Bind skill checkbox change events
+   */
+  function bindSkillCheckboxes() {
+    $(
+      "#id_skill_reading, #id_skill_listening, #id_skill_writing, #id_skill_speaking"
+    ).on("change", function () {
+      updateSkillSections();
+      updateBuilderJson();
+    });
+  }
+
+  /**
+   * Update skill section visibility based on checkboxes
+   */
+  function updateSkillSections() {
+    const skills = ["reading", "listening", "writing", "speaking"];
+
+    skills.forEach(function (skill) {
+      const isChecked = $("#id_skill_" + skill).is(":checked");
+      const section = $("#" + skill + "-section");
+      const durationWrapper = $(
+        "#duration_" + skill + "_wrapper, #fitem_id_duration_" + skill
+      );
+
+      if (isChecked) {
+        section.slideDown();
+        durationWrapper.show();
+      } else {
+        section.slideUp();
+        durationWrapper.hide();
+      }
+    });
+  }
+
+  /**
+   * Bind add buttons for each skill
+   */
+  function bindAddButtons() {
+    // Reading
+    $(document).on("click", "#add-reading-passage", function (e) {
+      e.preventDefault();
+      addReadingPassage();
+    });
+
+    $(document).on("click", ".add-question-group", function (e) {
+      e.preventDefault();
+      const passageId = $(this).data("passage-id");
+      const skill = $(this).data("skill") || "reading";
+      addQuestionGroup(passageId, skill);
+    });
+
+    $(document).on("click", ".add-question", function (e) {
+      e.preventDefault();
+      const groupId = $(this).data("group-id");
+      const skill = $(this).data("skill") || "reading";
+      addQuestion(groupId, skill);
+    });
+
+    // Listening
+    $(document).on("click", "#add-listening-section", function (e) {
+      e.preventDefault();
+      addListeningSection();
+    });
+
+    // Writing
+    $(document).on("click", "#add-writing-task", function (e) {
+      e.preventDefault();
+      addWritingTask();
+    });
+
+    // Speaking
+    $(document).on("click", "#add-speaking-part", function (e) {
+      e.preventDefault();
+      addSpeakingPart();
+    });
+
+    // Delete buttons
+    $(document).on("click", ".delete-item", function (e) {
+      e.preventDefault();
+      const itemType = $(this).data("type");
+      const itemId = $(this).data("id");
+      deleteItem(itemType, itemId);
+    });
+
+    // Add option for multiple choice
+    $(document).on("click", ".add-option", function (e) {
+      e.preventDefault();
+      const questionId = $(this).data("question-id");
+      addOption(questionId);
+    });
+
+    // Add speaking question
+    $(document).on("click", ".add-speaking-question", function (e) {
+      e.preventDefault();
+      const partId = $(this).data("part-id");
+      addSpeakingQuestion(partId);
+    });
+  }
+
+  /**
+   * Bind input method change
+   */
+  function bindInputMethodChange() {
+    $("#id_inputmethod")
+      .on("change", function () {
+        const method = $(this).val();
+        if (method === "builder") {
+          $("#ielts-exam-builder").show();
+          $("#fitem_id_content_json").closest(".fcontainer").hide();
+        } else {
+          $("#ielts-exam-builder").hide();
+          $("#fitem_id_content_json").closest(".fcontainer").show();
+        }
+      })
+      .trigger("change");
+  }
+
+  /**
+   * Bind form submission to generate JSON
+   */
+  function bindFormSubmission() {
+    $("form.mform").on("submit", function () {
+      if ($("#id_inputmethod").val() === "builder") {
+        updateBuilderJson();
+      }
+    });
+
+    // Also update on any input change within builder
+    $(document).on(
+      "input change",
+      "#ielts-exam-builder input, #ielts-exam-builder textarea, #ielts-exam-builder select",
+      function () {
+        updateBuilderJson();
+      }
+    );
+  }
+
+  /**
+   * Load existing exam data from hidden field
+   */
+  function loadExistingData() {
+    const existingJson =
+      $("#id_builder_json").val() || $("#id_content_json").val();
+    if (existingJson) {
+      try {
+        const data = JSON.parse(existingJson);
+        if (data) {
+          examData = data;
+
+          // Update ID counters based on existing data
+          updateIdCounters(data);
+
+          // Render existing content
+          renderExistingContent();
+        }
+      } catch (e) {
+        console.warn("Could not parse existing exam data:", e);
+      }
+    }
+  }
+
+  /**
+   * Update ID counters based on existing data
+   */
+  function updateIdCounters(data) {
+    if (data.reading) {
+      data.reading.forEach(function (passage) {
+        idCounters.passage = Math.max(idCounters.passage, passage.id + 1);
+        if (passage.groups) {
+          passage.groups.forEach(function (group) {
+            idCounters.group = Math.max(idCounters.group, group.id + 1);
+            if (group.questions) {
+              group.questions.forEach(function (q) {
+                idCounters.question = Math.max(idCounters.question, q.id + 1);
+              });
+            }
+          });
+        }
+      });
+    }
+    if (data.listening) {
+      data.listening.forEach(function (section) {
+        idCounters.section = Math.max(idCounters.section, section.id + 1);
+        if (section.groups) {
+          section.groups.forEach(function (group) {
+            idCounters.group = Math.max(idCounters.group, group.id + 1);
+            if (group.questions) {
+              group.questions.forEach(function (q) {
+                idCounters.question = Math.max(idCounters.question, q.id + 1);
+              });
+            }
+          });
+        }
+      });
+    }
+    if (data.writing) {
+      data.writing.forEach(function (task) {
+        idCounters.task = Math.max(idCounters.task, task.id + 1);
+      });
+    }
+    if (data.speaking) {
+      data.speaking.forEach(function (part) {
+        idCounters.part = Math.max(idCounters.part, part.id + 1);
+      });
+    }
+  }
+
+  /**
+   * Render existing content to the builder
+   */
+  function renderExistingContent() {
+    // Render reading passages
+    if (examData.reading && examData.reading.length > 0) {
+      examData.reading.forEach(function (passage) {
+        renderReadingPassage(passage);
+      });
+    }
+
+    // Render listening sections
+    if (examData.listening && examData.listening.length > 0) {
+      examData.listening.forEach(function (section) {
+        renderListeningSection(section);
+      });
+    }
+
+    // Render writing tasks
+    if (examData.writing && examData.writing.length > 0) {
+      examData.writing.forEach(function (task) {
+        renderWritingTask(task);
+      });
+    }
+
+    // Render speaking parts
+    if (examData.speaking && examData.speaking.length > 0) {
+      examData.speaking.forEach(function (part) {
+        renderSpeakingPart(part);
+      });
+    }
+  }
+
+  // ==========================================================
+  // READING FUNCTIONS
+  // ==========================================================
+
+  /**
+   * Add a new reading passage
+   */
+  function addReadingPassage() {
+    const passageId = idCounters.passage++;
+    const passage = {
+      id: passageId,
+      title: "Passage " + passageId,
+      content: "",
+      groups: [],
+    };
+
+    if (!examData.reading) {
+      examData.reading = [];
+    }
+    examData.reading.push(passage);
+
+    renderReadingPassage(passage);
+    updateBuilderJson();
+  }
+
+  /**
+   * Render a reading passage to the DOM
+   */
+  function renderReadingPassage(passage) {
+    const editorId = "passage_content_" + passage.id;
+    const html = `
+            <div class="passage-item card mb-3" data-passage-id="${passage.id}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="font-weight-bold">
+                        <i class="fa fa-file-text"></i> 
+                        <input type="text" class="form-control-plaintext d-inline-block w-auto passage-title" 
+                            value="${escapeHtml(
+                              passage.title
+                            )}" placeholder="Passage Title">
+                    </span>
+                    <button type="button" class="btn btn-sm btn-outline-danger delete-item" 
+                        data-type="passage" data-id="${passage.id}">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="${editorId}">Passage Content (HTML)</label>
+                        <div class="editor-wrapper" data-editor-id="${editorId}" data-passage-id="${
+      passage.id
+    }">
+                            <textarea class="form-control passage-content" id="${editorId}" 
+                                rows="10" 
+                                placeholder="Enter the reading passage content here...">${escapeHtml(
+                                  passage.content
+                                )}</textarea>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6>Question Groups</h6>
+                    <div class="question-groups-container" data-passage-id="${
+                      passage.id
+                    }"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary add-question-group" 
+                        data-passage-id="${passage.id}" data-skill="reading">
+                        <i class="fa fa-plus"></i> Add Question Group
+                    </button>
+                </div>
+            </div>
+        `;
+
+    $("#reading-passages-container").append(html);
+
+    // Initialize Moodle editor for this passage
+    initMoodleEditor(editorId, passage.content);
+
+    // Render existing groups
+    if (passage.groups && passage.groups.length > 0) {
+      passage.groups.forEach(function (group) {
+        renderQuestionGroup(passage.id, group, "reading");
+      });
+    }
+  }
+
+  /**
+   * Add a question group to a passage/section
+   */
+  function addQuestionGroup(parentId, skill) {
+    const groupId = idCounters.group++;
+    const group = {
+      id: groupId,
+      title: "Questions " + groupId,
+      instruction: "",
+      questions: [],
+    };
+
+    // Find parent and add group
+    let parent;
+    if (skill === "reading") {
+      parent = examData.reading.find((p) => p.id === parentId);
+    } else if (skill === "listening") {
+      parent = examData.listening.find((s) => s.id === parentId);
+    }
+
+    if (parent) {
+      if (!parent.groups) {
+        parent.groups = [];
+      }
+      parent.groups.push(group);
+      renderQuestionGroup(parentId, group, skill);
+      updateBuilderJson();
+    }
+  }
+
+  /**
+   * Render a question group
+   */
+  function renderQuestionGroup(parentId, group, skill) {
+    const html = `
+            <div class="question-group card mb-2" data-group-id="${group.id}">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                    <input type="text" class="form-control-plaintext group-title font-weight-bold" 
+                        value="${escapeHtml(
+                          group.title
+                        )}" placeholder="Group Title">
+                    <button type="button" class="btn btn-sm btn-outline-danger delete-item" 
+                        data-type="group" data-id="${
+                          group.id
+                        }" data-parent-id="${parentId}" data-skill="${skill}">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+                <div class="card-body py-2">
+                    <div class="form-group mb-2">
+                        <input type="text" class="form-control form-control-sm group-instruction" 
+                            value="${escapeHtml(group.instruction || "")}" 
+                            placeholder="Instructions (e.g., Choose the correct letter A, B, C or D)">
+                    </div>
+                    <div class="questions-container" data-group-id="${
+                      group.id
+                    }"></div>
+                    <button type="button" class="btn btn-sm btn-outline-info add-question" 
+                        data-group-id="${group.id}" data-skill="${skill}">
+                        <i class="fa fa-plus"></i> Add Question
+                    </button>
+                </div>
+            </div>
+        `;
+
+    $(
+      `.question-groups-container[data-passage-id="${parentId}"], .question-groups-container[data-section-id="${parentId}"]`
+    ).append(html);
+
+    // Render existing questions
+    if (group.questions && group.questions.length > 0) {
+      group.questions.forEach(function (question) {
+        renderQuestion(group.id, question);
+      });
+    }
+  }
+
+  /**
+   * Add a question to a group
+   */
+  function addQuestion(groupId, skill) {
+    const questionId = idCounters.question++;
+    const question = {
+      id: questionId,
+      number: String(questionId),
+      text: "",
+      type: "MULTIPLE_CHOICE",
+      options: ["", "", "", ""],
+      correctAnswer: "",
+    };
+
+    // Find group and add question
+    let found = false;
+
+    if (skill === "reading" && examData.reading) {
+      examData.reading.forEach(function (passage) {
+        if (passage.groups) {
+          const group = passage.groups.find((g) => g.id === groupId);
+          if (group) {
+            if (!group.questions) group.questions = [];
+            group.questions.push(question);
+            found = true;
+          }
+        }
+      });
+    }
+
+    if (!found && skill === "listening" && examData.listening) {
+      examData.listening.forEach(function (section) {
+        if (section.groups) {
+          const group = section.groups.find((g) => g.id === groupId);
+          if (group) {
+            if (!group.questions) group.questions = [];
+            group.questions.push(question);
+            found = true;
+          }
+        }
+      });
+    }
+
+    if (found) {
+      renderQuestion(groupId, question);
+      updateBuilderJson();
+    }
+  }
+
+  /**
+   * Render a question
+   */
+  function renderQuestion(groupId, question) {
+    const typeOptions = questionTypes
+      .map(
+        (t) =>
+          `<option value="${t.value}" ${
+            question.type === t.value ? "selected" : ""
+          }>${t.label}</option>`
+      )
+      .join("");
+
+    const optionsHtml =
+      question.type === "MULTIPLE_CHOICE" || question.type === "TRUE_FALSE"
+        ? renderOptionsEditor(question)
+        : "";
+
+    const html = `
+            <div class="question-item border rounded p-2 mb-2" data-question-id="${
+              question.id
+            }">
+                <div class="row align-items-center mb-2">
+                    <div class="col-auto">
+                        <input type="text" class="form-control form-control-sm question-number" 
+                            value="${escapeHtml(
+                              question.number
+                            )}" placeholder="#" style="width: 60px;">
+                    </div>
+                    <div class="col">
+                        <select class="form-control form-control-sm question-type">
+                            ${typeOptions}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-outline-danger delete-item" 
+                            data-type="question" data-id="${
+                              question.id
+                            }" data-group-id="${groupId}">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group mb-2">
+                    <textarea class="form-control form-control-sm question-text" rows="2" 
+                        placeholder="Question text...">${escapeHtml(
+                          question.text
+                        )}</textarea>
+                </div>
+                <div class="options-container">${optionsHtml}</div>
+                <div class="form-group mb-0">
+                    <input type="text" class="form-control form-control-sm question-answer" 
+                        value="${escapeHtml(question.correctAnswer || "")}" 
+                        placeholder="Correct answer (e.g., A, TRUE, keyword)">
+                </div>
+            </div>
+        `;
+
+    $(`.questions-container[data-group-id="${groupId}"]`).append(html);
+
+    // Bind type change
+    $(`.question-item[data-question-id="${question.id}"] .question-type`).on(
+      "change",
+      function () {
+        const newType = $(this).val();
+        question.type = newType;
+        const container = $(this)
+          .closest(".question-item")
+          .find(".options-container");
+
+        if (newType === "MULTIPLE_CHOICE") {
+          question.options = ["", "", "", ""];
+          container.html(renderOptionsEditor(question));
+        } else if (newType === "TRUE_FALSE") {
+          question.options = ["TRUE", "FALSE", "NOT GIVEN"];
+          container.html(renderOptionsEditor(question));
+        } else {
+          question.options = [];
+          container.html("");
+        }
+        updateBuilderJson();
+      }
+    );
+  }
+
+  /**
+   * Render options editor for multiple choice
+   */
+  function renderOptionsEditor(question) {
+    if (!question.options || question.options.length === 0) {
+      return "";
+    }
+
+    const letters = ["A", "B", "C", "D", "E", "F"];
+    let html = '<div class="options-list mb-2">';
+
+    question.options.forEach((opt, idx) => {
+      html += `
+                <div class="input-group input-group-sm mb-1">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text">${
+                          letters[idx] || idx + 1
+                        }</span>
+                    </div>
+                    <input type="text" class="form-control option-input" data-index="${idx}" 
+                        value="${escapeHtml(opt)}" placeholder="Option ${
+        letters[idx] || idx + 1
+      }">
+                </div>
+            `;
+    });
+
+    html += `</div>
+            <button type="button" class="btn btn-xs btn-link add-option" data-question-id="${question.id}">
+                + Add Option
+            </button>`;
+
+    return html;
+  }
+
+  /**
+   * Add option to a question
+   */
+  function addOption(questionId) {
+    // Find question and add option
+    let question = findQuestionById(questionId);
+    if (question) {
+      if (!question.options) question.options = [];
+      question.options.push("");
+
+      // Re-render options
+      const container = $(
+        `.question-item[data-question-id="${questionId}"] .options-container`
+      );
+      container.html(renderOptionsEditor(question));
+      updateBuilderJson();
+    }
+  }
+
+  // ==========================================================
+  // LISTENING FUNCTIONS
+  // ==========================================================
+
+  /**
+   * Add a new listening section
+   */
+  function addListeningSection() {
+    const sectionId = idCounters.section++;
+    const section = {
+      id: sectionId,
+      title: "Section " + sectionId,
+      audioUrl: "",
+      instruction: "",
+      groups: [],
+    };
+
+    if (!examData.listening) {
+      examData.listening = [];
+    }
+    examData.listening.push(section);
+
+    renderListeningSection(section);
+    updateBuilderJson();
+  }
+
+  /**
+   * Render a listening section
+   */
+  function renderListeningSection(section) {
+    const html = `
+            <div class="section-item card mb-3" data-section-id="${section.id}">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <span class="font-weight-bold">
+                        <i class="fa fa-headphones"></i> 
+                        <input type="text" class="form-control-plaintext d-inline-block w-auto text-white section-title" 
+                            value="${escapeHtml(
+                              section.title
+                            )}" placeholder="Section Title">
+                    </span>
+                    <button type="button" class="btn btn-sm btn-outline-light delete-item" 
+                        data-type="section" data-id="${section.id}">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Audio URL</label>
+                        <input type="url" class="form-control section-audio-url" 
+                            value="${escapeHtml(section.audioUrl || "")}" 
+                            placeholder="https://example.com/audio.mp3">
+                    </div>
+                    <div class="form-group">
+                        <label>Section Instructions (optional)</label>
+                        <input type="text" class="form-control section-instruction" 
+                            value="${escapeHtml(section.instruction || "")}" 
+                            placeholder="Instructions for this section...">
+                    </div>
+                    <hr>
+                    <h6>Question Groups</h6>
+                    <div class="question-groups-container" data-section-id="${
+                      section.id
+                    }"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary add-question-group" 
+                        data-passage-id="${section.id}" data-skill="listening">
+                        <i class="fa fa-plus"></i> Add Question Group
+                    </button>
+                </div>
+            </div>
+        `;
+
+    $("#listening-sections-container").append(html);
+
+    // Render existing groups
+    if (section.groups && section.groups.length > 0) {
+      section.groups.forEach(function (group) {
+        renderQuestionGroup(section.id, group, "listening");
+      });
+    }
+  }
+
+  // ==========================================================
+  // WRITING FUNCTIONS
+  // ==========================================================
+
+  /**
+   * Add a new writing task
+   */
+  function addWritingTask() {
+    const taskId = idCounters.task++;
+    const taskNum = examData.writing ? examData.writing.length + 1 : 1;
+    const task = {
+      id: taskId,
+      type: taskNum === 1 ? "TASK_1" : "TASK_2",
+      title: "Writing Task " + taskNum,
+      prompt: "",
+      imageUrl: "",
+      minWords: taskNum === 1 ? 150 : 250,
+    };
+
+    if (!examData.writing) {
+      examData.writing = [];
+    }
+    examData.writing.push(task);
+
+    renderWritingTask(task);
+    updateBuilderJson();
+  }
+
+  /**
+   * Render a writing task
+   */
+  function renderWritingTask(task) {
+    const html = `
+            <div class="task-item card mb-3" data-task-id="${task.id}">
+                <div class="card-header bg-warning d-flex justify-content-between align-items-center">
+                    <span class="font-weight-bold">
+                        <i class="fa fa-pencil"></i> 
+                        <input type="text" class="form-control-plaintext d-inline-block w-auto task-title" 
+                            value="${escapeHtml(
+                              task.title
+                            )}" placeholder="Task Title">
+                    </span>
+                    <button type="button" class="btn btn-sm btn-outline-dark delete-item" 
+                        data-type="task" data-id="${task.id}">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Task Type</label>
+                                <select class="form-control task-type">
+                                    <option value="TASK_1" ${
+                                      task.type === "TASK_1" ? "selected" : ""
+                                    }>Task 1 (Graph/Chart/Diagram)</option>
+                                    <option value="TASK_2" ${
+                                      task.type === "TASK_2" ? "selected" : ""
+                                    }>Task 2 (Essay)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Minimum Words</label>
+                                <input type="number" class="form-control task-min-words" 
+                                    value="${
+                                      task.minWords || 150
+                                    }" min="50" max="500">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Image URL (for Task 1)</label>
+                        <input type="url" class="form-control task-image-url" 
+                            value="${escapeHtml(task.imageUrl || "")}" 
+                            placeholder="https://example.com/chart.png">
+                    </div>
+                    <div class="form-group">
+                        <label>Task Prompt (HTML)</label>
+                        <textarea class="form-control task-prompt" rows="6" 
+                            placeholder="Enter the writing task prompt...">${escapeHtml(
+                              task.prompt
+                            )}</textarea>
+                    </div>
+                </div>
+            </div>
+        `;
+
+    $("#writing-tasks-container").append(html);
+  }
+
+  // ==========================================================
+  // SPEAKING FUNCTIONS
+  // ==========================================================
+
+  /**
+   * Add a new speaking part
+   */
+  function addSpeakingPart() {
+    const partId = idCounters.part++;
+    const partNum = examData.speaking
+      ? Math.min(examData.speaking.length + 1, 3)
+      : 1;
+    const part = {
+      id: partId,
+      partNumber: partNum,
+      title: "Part " + partNum,
+      description: "",
+      questions: [""],
+      preparationTime: partNum === 2 ? 60 : 0,
+      speakingTime: partNum === 2 ? 120 : 0,
+    };
+
+    if (!examData.speaking) {
+      examData.speaking = [];
+    }
+    examData.speaking.push(part);
+
+    renderSpeakingPart(part);
+    updateBuilderJson();
+  }
+
+  /**
+   * Render a speaking part
+   */
+  function renderSpeakingPart(part) {
+    const questionsHtml = part.questions
+      .map(
+        (q, idx) => `
+            <div class="input-group mb-2 speaking-question-item" data-index="${idx}">
+                <input type="text" class="form-control speaking-question-input" 
+                    value="${escapeHtml(q)}" placeholder="Question ${idx + 1}">
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-danger delete-speaking-question" 
+                        data-part-id="${part.id}" data-index="${idx}">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `
+      )
+      .join("");
+
+    const html = `
+            <div class="part-item card mb-3" data-part-id="${part.id}">
+                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                    <span class="font-weight-bold">
+                        <i class="fa fa-microphone"></i> 
+                        <input type="text" class="form-control-plaintext d-inline-block w-auto text-white part-title" 
+                            value="${escapeHtml(
+                              part.title
+                            )}" placeholder="Part Title">
+                    </span>
+                    <button type="button" class="btn btn-sm btn-outline-light delete-item" 
+                        data-type="part" data-id="${part.id}">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Part Number</label>
+                                <select class="form-control part-number">
+                                    <option value="1" ${
+                                      part.partNumber === 1 ? "selected" : ""
+                                    }>Part 1</option>
+                                    <option value="2" ${
+                                      part.partNumber === 2 ? "selected" : ""
+                                    }>Part 2</option>
+                                    <option value="3" ${
+                                      part.partNumber === 3 ? "selected" : ""
+                                    }>Part 3</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Preparation Time (seconds)</label>
+                                <input type="number" class="form-control part-prep-time" 
+                                    value="${
+                                      part.preparationTime || 0
+                                    }" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Speaking Time (seconds)</label>
+                                <input type="number" class="form-control part-speak-time" 
+                                    value="${part.speakingTime || 0}" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control part-description" rows="2" 
+                            placeholder="Part description...">${escapeHtml(
+                              part.description || ""
+                            )}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Questions/Topics</label>
+                        <div class="speaking-questions-container" data-part-id="${
+                          part.id
+                        }">
+                            ${questionsHtml}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-info add-speaking-question" 
+                            data-part-id="${part.id}">
+                            <i class="fa fa-plus"></i> Add Question
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+    $("#speaking-parts-container").append(html);
+  }
+
+  /**
+   * Add speaking question
+   */
+  function addSpeakingQuestion(partId) {
+    const part = examData.speaking.find((p) => p.id === partId);
+    if (part) {
+      if (!part.questions) part.questions = [];
+      part.questions.push("");
+
+      const idx = part.questions.length - 1;
+      const html = `
+                <div class="input-group mb-2 speaking-question-item" data-index="${idx}">
+                    <input type="text" class="form-control speaking-question-input" 
+                        value="" placeholder="Question ${idx + 1}">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-outline-danger delete-speaking-question" 
+                            data-part-id="${partId}" data-index="${idx}">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+      $(`.speaking-questions-container[data-part-id="${partId}"]`).append(html);
+      updateBuilderJson();
+    }
+  }
+
+  // ==========================================================
+  // DELETE FUNCTIONS
+  // ==========================================================
+
+  /**
+   * Delete an item
+   */
+  function deleteItem(type, id) {
+    if (!confirm("Are you sure you want to delete this item?")) {
+      return;
+    }
+
+    switch (type) {
+      case "passage":
+        // Destroy editor before removing
+        destroyEditor("passage_content_" + id);
+        examData.reading = examData.reading.filter((p) => p.id !== id);
+        $(`.passage-item[data-passage-id="${id}"]`).remove();
+        break;
+
+      case "section":
+        examData.listening = examData.listening.filter((s) => s.id !== id);
+        $(`.section-item[data-section-id="${id}"]`).remove();
+        break;
+
+      case "task":
+        examData.writing = examData.writing.filter((t) => t.id !== id);
+        $(`.task-item[data-task-id="${id}"]`).remove();
+        break;
+
+      case "part":
+        examData.speaking = examData.speaking.filter((p) => p.id !== id);
+        $(`.part-item[data-part-id="${id}"]`).remove();
+        break;
+
+      case "group":
+        deleteGroup(id);
+        $(`.question-group[data-group-id="${id}"]`).remove();
+        break;
+
+      case "question":
+        deleteQuestion(id);
+        $(`.question-item[data-question-id="${id}"]`).remove();
+        break;
+    }
+
+    updateBuilderJson();
+  }
+
+  /**
+   * Delete a group from all skills
+   */
+  function deleteGroup(groupId) {
+    ["reading", "listening"].forEach(function (skill) {
+      if (examData[skill]) {
+        examData[skill].forEach(function (parent) {
+          if (parent.groups) {
+            parent.groups = parent.groups.filter((g) => g.id !== groupId);
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Delete a question from all groups
+   */
+  function deleteQuestion(questionId) {
+    ["reading", "listening"].forEach(function (skill) {
+      if (examData[skill]) {
+        examData[skill].forEach(function (parent) {
+          if (parent.groups) {
+            parent.groups.forEach(function (group) {
+              if (group.questions) {
+                group.questions = group.questions.filter(
+                  (q) => q.id !== questionId
+                );
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // ==========================================================
+  // UTILITY FUNCTIONS
+  // ==========================================================
+
+  /**
+   * Find a question by ID across all skills
+   */
+  function findQuestionById(questionId) {
+    let found = null;
+
+    ["reading", "listening"].forEach(function (skill) {
+      if (examData[skill] && !found) {
+        examData[skill].forEach(function (parent) {
+          if (parent.groups && !found) {
+            parent.groups.forEach(function (group) {
+              if (group.questions) {
+                const q = group.questions.find((q) => q.id === questionId);
+                if (q) found = q;
+              }
+            });
+          }
+        });
+      }
+    });
+
+    return found;
+  }
+
+  /**
+   * Update builder JSON from DOM
+   */
+  function updateBuilderJson() {
+    // Get exam title from name field
+    examData.title = $("#id_name").val() || "";
+    examData.id = 1;
+
+    // Update durations (convert minutes to seconds)
+    examData.durations = {
+      reading: parseInt($("#id_duration_reading").val() || 60) * 60,
+      listening: parseInt($("#id_duration_listening").val() || 40) * 60,
+      writing: parseInt($("#id_duration_writing").val() || 60) * 60,
+      speaking: parseInt($("#id_duration_speaking").val() || 15) * 60,
+    };
+
+    // Update reading passages
+    if (examData.reading) {
+      examData.reading.forEach(function (passage) {
+        const passageEl = $(`.passage-item[data-passage-id="${passage.id}"]`);
+        passage.title = passageEl.find(".passage-title").val() || passage.title;
+
+        // Get content from editor (handles TinyMCE, Atto, or plain textarea)
+        const editorId = "passage_content_" + passage.id;
+        passage.content = getEditorContent(editorId);
+
+        if (passage.groups) {
+          passage.groups.forEach(function (group) {
+            updateGroupFromDom(group);
+          });
+        }
+      });
+    }
+
+    // Update listening sections
+    if (examData.listening) {
+      examData.listening.forEach(function (section) {
+        const sectionEl = $(`.section-item[data-section-id="${section.id}"]`);
+        section.title = sectionEl.find(".section-title").val() || section.title;
+        section.audioUrl = sectionEl.find(".section-audio-url").val() || "";
+        section.instruction =
+          sectionEl.find(".section-instruction").val() || "";
+
+        if (section.groups) {
+          section.groups.forEach(function (group) {
+            updateGroupFromDom(group);
+          });
+        }
+      });
+    }
+
+    // Update writing tasks
+    if (examData.writing) {
+      examData.writing.forEach(function (task) {
+        const taskEl = $(`.task-item[data-task-id="${task.id}"]`);
+        task.title = taskEl.find(".task-title").val() || task.title;
+        task.type = taskEl.find(".task-type").val() || "TASK_1";
+        task.prompt = taskEl.find(".task-prompt").val() || "";
+        task.imageUrl = taskEl.find(".task-image-url").val() || "";
+        task.minWords = parseInt(taskEl.find(".task-min-words").val()) || 150;
+      });
+    }
+
+    // Update speaking parts
+    if (examData.speaking) {
+      examData.speaking.forEach(function (part) {
+        const partEl = $(`.part-item[data-part-id="${part.id}"]`);
+        part.title = partEl.find(".part-title").val() || part.title;
+        part.partNumber = parseInt(partEl.find(".part-number").val()) || 1;
+        part.description = partEl.find(".part-description").val() || "";
+        part.preparationTime =
+          parseInt(partEl.find(".part-prep-time").val()) || 0;
+        part.speakingTime =
+          parseInt(partEl.find(".part-speak-time").val()) || 0;
+
+        // Update questions
+        part.questions = [];
+        partEl.find(".speaking-question-input").each(function () {
+          part.questions.push($(this).val());
+        });
+      });
+    }
+
+    // Remove empty skills based on checkboxes
+    if (!$("#id_skill_reading").is(":checked")) {
+      delete examData.reading;
+    }
+    if (!$("#id_skill_listening").is(":checked")) {
+      delete examData.listening;
+    }
+    if (!$("#id_skill_writing").is(":checked")) {
+      delete examData.writing;
+    }
+    if (!$("#id_skill_speaking").is(":checked")) {
+      delete examData.speaking;
+    }
+
+    // Store JSON
+    const jsonString = JSON.stringify(examData, null, 2);
+    $("#id_builder_json").val(jsonString);
+
+    // Also update content_json for preview
+    if ($("#id_inputmethod").val() === "builder") {
+      $("#id_content_json").val(jsonString);
+    }
+  }
+
+  /**
+   * Update a question group from DOM
+   */
+  function updateGroupFromDom(group) {
+    const groupEl = $(`.question-group[data-group-id="${group.id}"]`);
+    group.title = groupEl.find(".group-title").val() || group.title;
+    group.instruction = groupEl.find(".group-instruction").val() || "";
+
+    if (group.questions) {
+      group.questions.forEach(function (question) {
+        const questionEl = $(
+          `.question-item[data-question-id="${question.id}"]`
+        );
+        question.number =
+          questionEl.find(".question-number").val() || question.number;
+        question.text = questionEl.find(".question-text").val() || "";
+        question.type =
+          questionEl.find(".question-type").val() || "MULTIPLE_CHOICE";
+        question.correctAnswer =
+          questionEl.find(".question-answer").val() || "";
+
+        // Update options
+        if (
+          question.type === "MULTIPLE_CHOICE" ||
+          question.type === "TRUE_FALSE"
+        ) {
+          question.options = [];
+          questionEl.find(".option-input").each(function () {
+            question.options.push($(this).val());
+          });
+        }
+      });
+    }
+  }
+
+  /**
+   * Escape HTML entities
+   */
+  function escapeHtml(text) {
+    if (!text) return "";
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * Initialize Trumbowyg WYSIWYG editor for a textarea
+   * @param {string} editorId - The ID of the textarea element
+   * @param {string} initialContent - Initial content for the editor
+   */
+  function initMoodleEditor(editorId, initialContent) {
+    // Wait for Quill to be available
+    const initQuill = function () {
+      if (typeof Quill === "undefined") {
+        // Quill not loaded yet, retry after a short delay
+        setTimeout(initQuill, 100);
+        return;
+      }
+
+      const textarea = document.getElementById(editorId);
+      if (!textarea) {
+        console.warn("Textarea not found for editor:", editorId);
+        return;
+      }
+
+      // Check if already initialized
+      if (editorInstances[editorId]) {
+        return;
+      }
+
+      // Hide textarea and create editor container
+      textarea.style.display = "none";
+
+      const editorContainer = document.createElement("div");
+      editorContainer.id = editorId + "_quill";
+      editorContainer.style.minHeight = "250px";
+      editorContainer.style.backgroundColor = "#fff";
+      textarea.parentNode.insertBefore(editorContainer, textarea.nextSibling);
+
+      // Initialize Quill
+      const quill = new Quill("#" + editorId + "_quill", {
+        theme: "snow",
+        modules: {
+          toolbar: [
+            [{ header: [1, 2, 3, false] }],
+            ["bold", "italic", "underline", "strike"],
+            [{ color: [] }, { background: [] }],
+            [{ list: "ordered" }, { list: "bullet" }],
+            [{ indent: "-1" }, { indent: "+1" }],
+            [{ align: [] }],
+            ["link"],
+            ["clean"],
+          ],
+        },
+        placeholder: "Enter the reading passage content here...",
+      });
+
+      // Set initial content
+      if (initialContent) {
+        quill.root.innerHTML = initialContent;
+      }
+
+      // Sync content to textarea on change
+      quill.on("text-change", function () {
+        textarea.value = quill.root.innerHTML;
+        updateBuilderJson();
+      });
+
+      editorInstances[editorId] = quill;
+      console.log("Quill editor initialized for:", editorId);
+    };
+
+    // Start initialization
+    initQuill();
+  }
+
+  /**
+   * Get content from editor (handles both plain textarea and Quill editor)
+   * @param {string} editorId - The ID of the editor/textarea
+   * @returns {string} The content
+   */
+  function getEditorContent(editorId) {
+    // If Quill is initialized, get HTML content
+    if (editorInstances[editorId] && editorInstances[editorId].root) {
+      return editorInstances[editorId].root.innerHTML || "";
+    }
+    // Fallback to textarea value
+    return $("#" + editorId).val() || "";
+  }
+
+  /**
+   * Destroy editor instance before removing element
+   * @param {string} editorId - The ID of the editor
+   */
+  function destroyEditor(editorId) {
+    // Remove Quill container if exists
+    const quillContainer = document.getElementById(editorId + "_quill");
+    if (quillContainer) {
+      quillContainer.remove();
+    }
+    delete editorInstances[editorId];
+  }
+
+  return {
+    init: init,
+  };
+});

@@ -49,11 +49,16 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     isLoading,
     error,
     isApiInitialized,
+    // Review mode
+    setReviewMode,
   } = useExamStore();
 
   const [loading, setLoading] = useState(true);
   // Track the previous timeLeft value to detect when it goes from >0 to 0
   const prevTimeLeftRef = useRef<number>(0);
+
+  // Check if we're in review mode
+  const isReviewMode = config.reviewMode === true;
 
   // Get available skills from exam data
   const availableSkills = useMemo(
@@ -72,9 +77,34 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     if (!isApiInitialized) return; // Wait for API to be initialized
 
     const initExam = async () => {
-      // Get exam ID from URL params (required)
-      const urlParams = new URLSearchParams(window.location.search);
-      const examId = parseInt(urlParams.get("examid") || "1", 10);
+      // Get exam ID from MoodleConfig (instanceId)
+      const examId =
+        config.instanceId ||
+        parseInt(
+          new URLSearchParams(window.location.search).get("examid") || "1",
+          10
+        );
+
+      // If in review mode, first load exam data, then set review state
+      if (isReviewMode && config.attemptData) {
+        console.log(
+          "Review mode: Loading exam and attempt data",
+          config.attemptId
+        );
+
+        // Load exam data first (needed for displaying questions in ResultPage)
+        await loadExam(examId);
+
+        // Then set review mode with attempt data
+        setReviewMode(true, config.attemptData);
+        setLoading(false);
+
+        // Navigate to result page
+        navigate(ROUTES.RESULT, { replace: true });
+        return;
+      }
+
+      console.log("Loading exam with instanceId:", examId);
 
       // Load from API - no fallback to mock data
       await loadExam(examId);
@@ -82,7 +112,16 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     };
 
     initExam();
-  }, [isApiInitialized, loadExam]);
+  }, [
+    isApiInitialized,
+    loadExam,
+    config.instanceId,
+    isReviewMode,
+    config.attemptData,
+    config.attemptId,
+    setReviewMode,
+    navigate,
+  ]);
 
   // Helper to get duration - uses examData.durations per skill, with fallback to defaults
   const getEffectiveDuration = (skill: SkillType): number => {
@@ -276,8 +315,13 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     .toString()
     .padStart(2, "0")}`;
 
+  // When submitted/result page, use different layout style for scrolling
+  const layoutStyle = isSubmitted
+    ? { minHeight: "100vh", overflow: "auto" }
+    : {};
+
   return (
-    <Layout className={styles.appLayout}>
+    <Layout className={styles.appLayout} style={layoutStyle}>
       {!isSubmitted && (
         <Header className={styles.header}>
           <div className={styles.headerLeft}>
@@ -323,7 +367,14 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
         </Header>
       )}
 
-      <Content className={styles.content}>
+      <Content
+        className={styles.content}
+        style={
+          isSubmitted
+            ? { height: "auto", minHeight: "100vh", overflow: "visible" }
+            : {}
+        }
+      >
         <Suspense
           key={currentSkill}
           fallback={

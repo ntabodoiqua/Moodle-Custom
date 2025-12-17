@@ -14,6 +14,15 @@ import {
   initializeApi,
 } from "../services/ieltsApi";
 
+interface AttemptData {
+  band: number;
+  answers: UserAnswers;
+  writingEssays?: WritingSubmissions;
+  speakingAudio?: Record<number, string>; // URLs instead of Blobs for review
+  timeTaken?: number;
+  completedAt?: string;
+}
+
 interface ExamState {
   // Dữ liệu đề thi
   examData: ExamData | null;
@@ -28,6 +37,10 @@ interface ExamState {
   isLoading: boolean; // Loading state for async operations
   error: string | null; // Error message if any
   isApiInitialized: boolean; // Track if API has been initialized
+
+  // Review mode
+  isReviewMode: boolean; // True when reviewing a past attempt
+  reviewBand: number | null; // Band score from the reviewed attempt
 
   // Lưu bài làm
   answers: UserAnswers; // Reading & Listening
@@ -53,6 +66,9 @@ interface ExamState {
   initApi: (config: MoodleConfig) => void;
   loadExam: (id: number) => Promise<void>;
   submitAssessment: () => Promise<number | null>;
+
+  // Review mode action
+  setReviewMode: (isReview: boolean, attemptData?: AttemptData) => void;
 }
 
 export const useExamStore = create<ExamState>((set, get) => ({
@@ -66,6 +82,10 @@ export const useExamStore = create<ExamState>((set, get) => ({
   isLoading: false,
   error: null,
   isApiInitialized: false,
+
+  // Review mode
+  isReviewMode: false,
+  reviewBand: null,
 
   answers: {},
   writingEssays: {},
@@ -211,6 +231,30 @@ export const useExamStore = create<ExamState>((set, get) => ({
         error: error instanceof Error ? error.message : "Submission failed",
       });
       return null;
+    }
+  },
+
+  // Set review mode with attempt data
+  setReviewMode: (isReview: boolean, attemptData?: AttemptData) => {
+    if (isReview && attemptData) {
+      set({
+        isReviewMode: true,
+        isSubmitted: true, // Mark as submitted to show ResultPage
+        reviewBand: attemptData.band,
+        answers: attemptData.answers || {},
+        writingEssays: attemptData.writingEssays || {},
+        timeTaken: attemptData.timeTaken || null,
+        // Reset other states
+        timeLeft: 0,
+        endTime: null,
+        isLoading: false,
+        error: null,
+      });
+    } else {
+      set({
+        isReviewMode: false,
+        reviewBand: null,
+      });
     }
   },
 }));

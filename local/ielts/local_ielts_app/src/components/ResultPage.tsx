@@ -32,8 +32,15 @@ interface ResultPageProps {
 }
 
 const ResultPage = ({ config }: ResultPageProps) => {
-  const { answers, writingEssays, speakingAudio, examData, timeTaken } =
-    useExamStore();
+  const {
+    answers,
+    writingEssays,
+    speakingAudio,
+    examData,
+    timeTaken,
+    isReviewMode,
+    reviewBand,
+  } = useExamStore();
 
   // Format time taken for display
   const formatTimeTaken = (seconds: number | null): string => {
@@ -283,7 +290,13 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
   // Calculate overall band score based on auto-graded skills only (Reading & Listening)
   // Writing & Speaking require teacher grading and are excluded
+  // In review mode, use the pre-calculated band from the database
   const calculateOverallScore = (): string => {
+    // If in review mode and we have a stored band, use it
+    if (isReviewMode && reviewBand !== null) {
+      return reviewBand.toFixed(1);
+    }
+
     const scores: number[] = [];
     // Only include auto-graded skills (Reading & Listening)
     if (readingScore !== null) scores.push(readingScore);
@@ -330,9 +343,20 @@ const ResultPage = ({ config }: ResultPageProps) => {
     }
   };
 
-  // Handle retake
+  // Handle retake (not shown in review mode)
   const handleRetake = () => {
     window.location.reload();
+  };
+
+  // Handle back to overview (for review mode)
+  const handleBackToOverview = () => {
+    if (config?.backUrl) {
+      window.location.href = config.backUrl;
+    } else if (config?.wwwroot && config?.instanceId) {
+      window.location.href = `${config.wwwroot}/mod/ielts/view.php?id=${config.instanceId}`;
+    } else {
+      window.history.back();
+    }
   };
 
   // Handle go to dashboard (Moodle integration)
@@ -1108,23 +1132,37 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
         {/* Action Buttons */}
         <div className={styles.actionButtons}>
-          <Button
-            size="large"
-            icon={<ReloadOutlined />}
-            onClick={handleRetake}
-            className={`${styles.actionButton} ${styles.secondaryButton}`}
-          >
-            Retake Test
-          </Button>
-          <Button
-            type="primary"
-            size="large"
-            icon={<HomeOutlined />}
-            onClick={handleGoToDashboard}
-            className={`${styles.actionButton} ${styles.primaryButton}`}
-          >
-            Back to Dashboard
-          </Button>
+          {isReviewMode ? (
+            <Button
+              type="primary"
+              size="large"
+              icon={<LeftOutlined />}
+              onClick={handleBackToOverview}
+              className={`${styles.actionButton} ${styles.primaryButton}`}
+            >
+              Back to Overview
+            </Button>
+          ) : (
+            <>
+              <Button
+                size="large"
+                icon={<ReloadOutlined />}
+                onClick={handleRetake}
+                className={`${styles.actionButton} ${styles.secondaryButton}`}
+              >
+                Retake Test
+              </Button>
+              <Button
+                type="primary"
+                size="large"
+                icon={<HomeOutlined />}
+                onClick={handleGoToDashboard}
+                className={`${styles.actionButton} ${styles.primaryButton}`}
+              >
+                Back to Dashboard
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

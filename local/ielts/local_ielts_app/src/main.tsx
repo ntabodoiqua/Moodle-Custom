@@ -1,14 +1,7 @@
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
-
-// Define Moodle configuration interface
-interface MoodleConfig {
-  userId: number;
-  sesskey: string;
-  wwwroot: string;
-  apiEndpoint: string;
-}
+import type { MoodleConfig } from "./types";
 
 // Find the root element
 const rootElement = document.getElementById("root");

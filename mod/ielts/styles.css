@@ -1,0 +1,211 @@
+/**
+ * IELTS Exam Builder Styles
+ *
+ * @package    mod_ielts
+ * @copyright  2025 Your Name
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+/* Builder Container */
+.ielts-builder-container {
+  max-width: 100%;
+}
+
+/* Skills Selector */
+.ielts-skills-selector .form-check {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 1.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ielts-skills-selector .form-check:hover {
+  background-color: #f8f9fa;
+}
+
+.ielts-skills-selector .form-check input:checked + label {
+  font-weight: bold;
+}
+
+/* Duration Settings */
+.ielts-duration-settings .duration-field {
+  margin-bottom: 0.5rem;
+}
+
+.ielts-duration-settings input {
+  display: inline-block;
+  width: auto;
+}
+
+/* Skill Sections */
+.ielts-skill-section {
+  border-left: 4px solid;
+}
+
+#reading-section {
+  border-left-color: #007bff;
+}
+
+#listening-section {
+  border-left-color: #28a745;
+}
+
+#writing-section {
+  border-left-color: #ffc107;
+}
+
+#speaking-section {
+  border-left-color: #dc3545;
+}
+
+/* Passage/Section Items */
+.passage-item,
+.section-item,
+.task-item,
+.part-item {
+  transition: box-shadow 0.2s;
+}
+
+.passage-item:hover,
+.section-item:hover,
+.task-item:hover,
+.part-item:hover {
+  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+/* Question Groups */
+.question-group {
+  border: 1px solid #dee2e6;
+}
+
+.question-group .card-header {
+  padding: 0.5rem 1rem;
+}
+
+/* Question Items */
+.question-item {
+  background-color: #f8f9fa;
+}
+
+.question-item .question-number {
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Options List */
+.options-list .input-group {
+  max-width: 400px;
+}
+
+.options-list .input-group-text {
+  min-width: 35px;
+  justify-content: center;
+}
+
+/* Form Control Plaintext (Inline Editing) */
+.form-control-plaintext {
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  padding: 0.25rem 0;
+  transition: border-color 0.2s;
+}
+
+.form-control-plaintext:hover,
+.form-control-plaintext:focus {
+  border-bottom-color: currentColor;
+  outline: none;
+}
+
+/* Delete Buttons */
+.delete-item {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.delete-item:hover {
+  opacity: 1;
+}
+
+/* Speaking Questions Container */
+.speaking-questions-container .input-group {
+  max-width: 100%;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ielts-skills-selector .form-check {
+    display: block;
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .ielts-duration-settings .col-md-3 {
+    margin-bottom: 1rem;
+  }
+}
+
+/* JSON Editor */
+.content-json-editor {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  tab-size: 2;
+}
+
+/* Gap Classes */
+.gap-3 > * {
+  margin-right: 1rem;
+}
+
+.gap-3 > *:last-child {
+  margin-right: 0;
+}
+
+/* Card improvements */
+.card {
+  border-radius: 0.5rem;
+}
+
+.card-header {
+  border-radius: 0.5rem 0.5rem 0 0 !important;
+}
+
+/* Button styles */
+.btn-xs {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.75rem;
+}
+
+/* Input group fixes */
+.input-group-sm .input-group-text {
+  padding: 0.25rem 0.5rem;
+}
+
+/* Transition for sections */
+.ielts-skill-section {
+  transition: all 0.3s ease;
+}
+
+/* Make inline inputs look better */
+input.form-control-plaintext.text-white::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Better visibility for card headers with input */
+.card-header .form-control-plaintext {
+  font-size: inherit;
+}
+
+/* Alert/help text styling */
+.ielts-skill-section > .card-body > p.text-muted:first-of-type {
+  font-style: italic;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
+}

@@ -1,12 +1,35 @@
 // src/types/index.ts
 
+// --- USER ANSWERS & SUBMISSIONS ---
+// Moved up for use in MoodleConfig
+export type UserAnswers = Record<number, string>; // questionId -> answer
+export type WritingSubmissions = Record<number, string>; // taskId -> essay text
+export type SpeakingSubmissions = Record<number, Blob>; // partId -> audio blob
+
 // --- MOODLE CONFIG ---
 export interface MoodleConfig {
   userId: number;
   sesskey: string;
   wwwroot: string;
   apiEndpoint: string;
+  instanceId: number; // IELTS instance ID in database
+  cmId?: number; // Course module ID
+  courseId?: number; // Course ID
+  examName?: string; // Exam name
+  canSubmit?: boolean; // Whether user can submit
   fullName?: string;
+  // Review mode properties
+  reviewMode?: boolean;
+  attemptId?: number;
+  attemptData?: {
+    band: number;
+    timecreated?: number;
+    timefinished?: number;
+    timeTaken?: number;
+    answers: UserAnswers;
+    writingEssays?: WritingSubmissions;
+  };
+  backUrl?: string;
 }
 
 // --- COMMON (Dùng chung) ---
@@ -93,19 +116,6 @@ export interface ExamData {
   listening?: ListeningSection[];
   writing?: WritingTask[];
   speaking?: SpeakingPart[];
-}
-
-// --- SUBMISSION TYPES ---
-export interface UserAnswers {
-  [questionId: number]: string; // Dùng cho Reading/Listening
-}
-
-export interface WritingSubmissions {
-  [taskId: number]: string; // Lưu bài văn (text)
-}
-
-export interface SpeakingSubmissions {
-  [partId: number]: Blob; // Lưu file ghi âm (Blob audio)
 }
 
 // --- HELPER FUNCTIONS ---
