@@ -46,6 +46,10 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     submitExam,
     answers,
     setAnswer,
+    writingEssays,
+    setEssay,
+    speakingAudio,
+    setRecording,
   } = useExamStore();
 
   const [loading, setLoading] = useState(true);
@@ -75,7 +79,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
 
   // Navigate based on current skill
   useEffect(() => {
-    if (loading) return;
+    if (loading || isSubmitted) return;
 
     const routeMap = {
       READING: ROUTES.READING,
@@ -88,7 +92,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     if (targetRoute) {
       navigate(targetRoute, { replace: true });
     }
-  }, [currentSkill, loading, navigate]);
+  }, [currentSkill, loading, isSubmitted, navigate]);
 
   const handleTimeOut = () => {
     message.warning("Time's up for this section!");
@@ -120,9 +124,13 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
       okText: "Yes, Submit",
       cancelText: "No, keep working",
       onOk: () => {
+        // Set submitted first to prevent skill navigation
         submitExam();
-        navigate(ROUTES.RESULT);
-        message.success("Exam submitted successfully!");
+        // Then navigate to result
+        setTimeout(() => {
+          navigate(ROUTES.RESULT, { replace: true });
+          message.success("Exam submitted successfully!");
+        }, 50);
       },
     });
   };
@@ -135,9 +143,10 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     );
   }
 
-  if (isSubmitted) {
-    return <Navigate to={ROUTES.RESULT} replace />;
-  }
+  // Remove automatic redirect - let navigate handle it
+  // if (isSubmitted) {
+  //   return <Navigate to={ROUTES.RESULT} replace />;
+  // }
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -147,44 +156,50 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
 
   return (
     <Layout className={styles.appLayout}>
-      <Header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <div className={styles.logo}>IELTS Mock Test</div>
-          <div className={styles.divider}></div>
-          <div className={styles.userInfo}>
-            <UserOutlined />
-            <span>Candidate ID: {config.userId}</span>
+      {!isSubmitted && (
+        <Header className={styles.header}>
+          <div className={styles.headerLeft}>
+            <div className={styles.logo}>IELTS Mock Test</div>
+            <div className={styles.divider}></div>
+            <div className={styles.userInfo}>
+              <UserOutlined />
+              <span>Candidate ID: {config.userId}</span>
+            </div>
           </div>
-        </div>
 
-        <div className={styles.timerSection}>
-          <ClockCircleOutlined style={{ fontSize: "20px", color: "#059669" }} />
-          <span className={styles.timerLabel}>{minutes} minutes remaining</span>
-          <div
-            className={`${styles.timerValue} ${
-              timeLeft < 300 ? styles.warning : ""
-            }`}
-          >
-            {timeDisplay}
+          <div className={styles.timerSection}>
+            <ClockCircleOutlined
+              style={{ fontSize: "20px", color: "#059669" }}
+            />
+            <span className={styles.timerLabel}>
+              {minutes} minutes remaining
+            </span>
+            <div
+              className={`${styles.timerValue} ${
+                timeLeft < 300 ? styles.warning : ""
+              }`}
+            >
+              {timeDisplay}
+            </div>
           </div>
-        </div>
 
-        <div className={styles.headerRight}>
-          <Button icon={<FullscreenOutlined />} type="text" />
-          <Button
-            type="default"
-            style={{
-              backgroundColor: "#16a34a",
-              borderColor: "#16a34a",
-              color: "#ffffff",
-              fontWeight: 600,
-            }}
-            onClick={handleSubmit}
-          >
-            Submit
-          </Button>
-        </div>
-      </Header>
+          <div className={styles.headerRight}>
+            <Button icon={<FullscreenOutlined />} type="text" />
+            <Button
+              type="default"
+              style={{
+                backgroundColor: "#16a34a",
+                borderColor: "#16a34a",
+                color: "#ffffff",
+                fontWeight: 600,
+              }}
+              onClick={handleSubmit}
+            >
+              Submit
+            </Button>
+          </div>
+        </Header>
+      )}
 
       <Content className={styles.content}>
         <Suspense
@@ -208,10 +223,31 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
                 <ReadingTest answers={answers} onAnswerChange={setAnswer} />
               }
             />
-            <Route path={ROUTES.LISTENING} element={<ListeningTest />} />
-            <Route path={ROUTES.WRITING} element={<WritingTest />} />
-            <Route path={ROUTES.SPEAKING} element={<SpeakingTest />} />
-            <Route path={ROUTES.RESULT} element={<ResultPage />} />
+            <Route
+              path={ROUTES.LISTENING}
+              element={
+                <ListeningTest answers={answers} onAnswerChange={setAnswer} />
+              }
+            />
+            <Route
+              path={ROUTES.WRITING}
+              element={
+                <WritingTest essays={writingEssays} onEssayChange={setEssay} />
+              }
+            />
+            <Route
+              path={ROUTES.SPEAKING}
+              element={
+                <SpeakingTest
+                  recordings={speakingAudio}
+                  onRecordingChange={setRecording}
+                />
+              }
+            />
+            <Route
+              path={ROUTES.RESULT}
+              element={<ResultPage config={config} />}
+            />
             <Route
               path="*"
               element={<Navigate to={ROUTES.READING} replace />}
@@ -220,47 +256,49 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
         </Suspense>
       </Content>
 
-      <Footer className={styles.footer}>
-        <div className={styles.footerLeft}>
-          Current Section:
-          <span className={styles.footerCurrentSkill}>{currentSkill}</span>
-        </div>
+      {!isSubmitted && (
+        <Footer className={styles.footer}>
+          <div className={styles.footerLeft}>
+            Current Section:
+            <span className={styles.footerCurrentSkill}>{currentSkill}</span>
+          </div>
 
-        <div className={styles.footerRight}>
-          {currentSkill !== "SPEAKING" ? (
-            <Button
-              type="primary"
-              icon={<RightOutlined />}
-              onClick={handleNextSkill}
-              style={{
-                backgroundColor: "#2563eb",
-                borderColor: "#2563eb",
-                height: "44px",
-                padding: "0 28px",
-                fontWeight: "600",
-                fontSize: "15px",
-              }}
-            >
-              Next Skill
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              danger
-              icon={<CheckOutlined />}
-              onClick={handleSubmit}
-              style={{
-                height: "44px",
-                padding: "0 28px",
-                fontWeight: "600",
-                fontSize: "15px",
-              }}
-            >
-              Finish Test
-            </Button>
-          )}
-        </div>
-      </Footer>
+          <div className={styles.footerRight}>
+            {currentSkill !== "SPEAKING" ? (
+              <Button
+                type="primary"
+                icon={<RightOutlined />}
+                onClick={handleNextSkill}
+                style={{
+                  backgroundColor: "#2563eb",
+                  borderColor: "#2563eb",
+                  height: "44px",
+                  padding: "0 28px",
+                  fontWeight: "600",
+                  fontSize: "15px",
+                }}
+              >
+                Next Skill
+              </Button>
+            ) : (
+              <Button
+                type="primary"
+                danger
+                icon={<CheckOutlined />}
+                onClick={handleSubmit}
+                style={{
+                  height: "44px",
+                  padding: "0 28px",
+                  fontWeight: "600",
+                  fontSize: "15px",
+                }}
+              >
+                Finish Test
+              </Button>
+            )}
+          </div>
+        </Footer>
+      )}
     </Layout>
   );
 };
