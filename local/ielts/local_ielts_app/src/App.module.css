@@ -1,0 +1,132 @@
+/* App Layout Styles */
+.appLayout {
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+.header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 70px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 20px;
+  color: #1e40af;
+  letter-spacing: -0.5px;
+}
+
+.divider {
+  height: 30px;
+  width: 1px;
+  background-color: #d1d5db;
+}
+
+.userInfo {
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.timerSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #f9fafb;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.timerLabel {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.timerValue {
+  font-size: 28px;
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+  color: #059669;
+  letter-spacing: 1px;
+}
+
+.timerValue.warning {
+  color: #dc2626;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.headerRight {
+  display: flex;
+  gap: 12px;
+}
+
+.content {
+  height: calc(100vh - 70px - 70px);
+  overflow: hidden;
+  background-color: #f9fafb;
+  position: relative;
+}
+
+.footer {
+  background-color: #1f2937;
+  height: 70px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.footerLeft {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.footerCurrentSkill {
+  color: #ffffff;
+  font-weight: 700;
+  margin-left: 8px;
+  font-size: 16px;
+}
+
+.footerRight {
+  display: flex;
+  gap: 12px;
+}
+
+.loadingContainer {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f9fafb;
+}
