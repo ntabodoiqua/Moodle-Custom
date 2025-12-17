@@ -1,5 +1,14 @@
 // src/types/index.ts
 
+// --- MOODLE CONFIG ---
+export interface MoodleConfig {
+  userId: number;
+  sesskey: string;
+  wwwroot: string;
+  apiEndpoint: string;
+  fullName?: string;
+}
+
 // --- COMMON (Dùng chung) ---
 export type SkillType = "READING" | "LISTENING" | "WRITING" | "SPEAKING";
 
@@ -14,6 +23,9 @@ export interface Question {
     | "MATCHING"
     | "MAP_LABELING";
   options?: string[]; // Cho trắc nghiệm
+  correctAnswer?: string; // Đáp án đúng
+  explanation?: string; // Giải thích đáp án
+  referenceText?: string; // Đoạn văn tham chiếu (cho Reading)
 }
 
 export interface QuestionGroup {

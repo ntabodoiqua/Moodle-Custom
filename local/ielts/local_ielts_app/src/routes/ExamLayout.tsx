@@ -9,7 +9,6 @@ import {
   FullscreenOutlined,
 } from "@ant-design/icons";
 import { useExamStore } from "../store/examStore";
-import { MOCK_EXAM } from "../data/mockData";
 import { ROUTES } from "./routes";
 import {
   ReadingTest,
@@ -19,16 +18,9 @@ import {
   ResultPage,
 } from "./lazyComponents";
 import styles from "../App.module.css";
+import type { MoodleConfig } from "../types";
 
 const { Header, Content, Footer } = Layout;
-
-interface MoodleConfig {
-  userId: number;
-  sesskey: string;
-  wwwroot: string;
-  apiEndpoint: string;
-  fullName?: string;
-}
 
 interface ExamLayoutProps {
   config: MoodleConfig;
@@ -37,7 +29,7 @@ interface ExamLayoutProps {
 const ExamLayout = ({ config }: ExamLayoutProps) => {
   const navigate = useNavigate();
   const {
-    setExamData,
+    examData,
     currentSkill,
     setSkill,
     timeLeft,
@@ -50,17 +42,29 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     setEssay,
     speakingAudio,
     setRecording,
+    // Async actions
+    loadExam,
+    submitAssessment,
+    isLoading,
+    error,
   } = useExamStore();
 
   const [loading, setLoading] = useState(true);
 
-  // 1. INIT: Load exam data
+  // 1. INIT: Load exam data from API
   useEffect(() => {
-    setTimeout(() => {
-      setExamData(MOCK_EXAM, "READING");
+    const initExam = async () => {
+      // Get exam ID from URL params (required)
+      const urlParams = new URLSearchParams(window.location.search);
+      const examId = parseInt(urlParams.get("examid") || "1", 10);
+
+      // Load from API - no fallback to mock data
+      await loadExam(examId);
       setLoading(false);
-    }, 1000);
-  }, [setExamData]);
+    };
+
+    initExam();
+  }, [loadExam]);
 
   // 2. TIMER: Countdown
   useEffect(() => {
@@ -123,22 +127,84 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
         "Are you sure you want to finish the test? You cannot change your answers after submitting.",
       okText: "Yes, Submit",
       cancelText: "No, keep working",
-      onOk: () => {
-        // Set submitted first to prevent skill navigation
-        submitExam();
-        // Then navigate to result
+      onOk: async () => {
+        // Try to submit to API first
+        const attemptId = await submitAssessment();
+
+        if (attemptId) {
+          message.success(
+            `Exam submitted successfully! (Attempt #${attemptId})`
+          );
+        } else {
+          // Fallback: just mark as submitted locally
+          submitExam();
+          message.success("Exam submitted successfully!");
+        }
+
+        // Navigate to result
         setTimeout(() => {
           navigate(ROUTES.RESULT, { replace: true });
-          message.success("Exam submitted successfully!");
         }, 50);
       },
     });
   };
 
-  if (loading) {
+  // Retry loading exam
+  const handleRetry = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const examId = parseInt(urlParams.get("examid") || "1", 10);
+    loadExam(examId);
+  };
+
+  // Show loading spinner
+  if (loading || isLoading) {
     return (
       <div className={styles.loadingContainer}>
-        <Spin size="large" tip="Loading Exam..." />
+        <Spin size="large" tip="Đang tải đề thi..." />
+      </div>
+    );
+  }
+
+  // Show error state - NO fallback to mock data
+  if (error || !examData) {
+    return (
+      <div className={styles.loadingContainer}>
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              fontSize: "48px",
+              marginBottom: "16px",
+              color: "#ff4d4f",
+            }}
+          >
+            ⚠️
+          </div>
+          <p
+            style={{
+              fontSize: "20px",
+              fontWeight: "600",
+              marginBottom: "8px",
+              color: "#262626",
+            }}
+          >
+            Không thể tải đề thi
+          </p>
+          <p style={{ color: "#666", marginBottom: "24px", maxWidth: "400px" }}>
+            {error ||
+              "Đã xảy ra lỗi khi kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại."}
+          </p>
+          <Button
+            type="primary"
+            size="large"
+            onClick={handleRetry}
+            style={{ marginRight: "12px" }}
+          >
+            🔄 Thử lại
+          </Button>
+          <Button size="large" onClick={() => window.history.back()}>
+            ← Quay lại
+          </Button>
+        </div>
       </div>
     );
   }

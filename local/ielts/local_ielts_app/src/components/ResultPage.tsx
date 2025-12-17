@@ -1,5 +1,5 @@
 // src/components/ResultPage.tsx
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Button, Tooltip, message } from "antd";
 import {
   CheckCircleOutlined,
@@ -23,16 +23,8 @@ import {
   LeftOutlined,
 } from "@ant-design/icons";
 import { useExamStore } from "../store/examStore";
-import { MOCK_ANSWERS, MOCK_EXAM } from "../data/mockData";
 import styles from "./ResultPage.module.css";
-
-interface MoodleConfig {
-  userId: number;
-  sesskey: string;
-  wwwroot: string;
-  apiEndpoint: string;
-  fullName?: string;
-}
+import type { MoodleConfig } from "../types";
 
 interface ResultPageProps {
   config?: MoodleConfig;
@@ -48,8 +40,38 @@ const ResultPage = ({ config }: ResultPageProps) => {
   const [activeListeningPart, setActiveListeningPart] = useState(0);
   const audioRefs = useRef<{ [key: number]: HTMLAudioElement | null }>({});
 
-  // Get exam data from store or use mock data
-  const exam = examData || MOCK_EXAM;
+  // IMPORTANT: examData must come from backend API, no fallback to mock
+  const exam = examData;
+
+  // Build answer key map from examData (correctAnswer from backend)
+  const answerKeyMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    if (!exam) return map;
+
+    // Reading answers
+    exam.reading?.forEach((passage) => {
+      passage.groups.forEach((group) => {
+        group.questions.forEach((q) => {
+          if (q.correctAnswer) {
+            map[q.id] = q.correctAnswer;
+          }
+        });
+      });
+    });
+
+    // Listening answers
+    exam.listening?.forEach((section) => {
+      section.groups.forEach((group) => {
+        group.questions.forEach((q) => {
+          if (q.correctAnswer) {
+            map[q.id] = q.correctAnswer;
+          }
+        });
+      });
+    });
+
+    return map;
+  }, [exam]);
 
   // Get all questions with their correct answers organized by skill
   const getReadingQuestions = () => {
@@ -60,8 +82,9 @@ const ResultPage = ({ config }: ResultPageProps) => {
       text: string;
       type: string;
       options?: string[];
+      correctAnswer?: string;
     }[] = [];
-    exam.reading?.forEach((passage, partIndex) => {
+    exam?.reading?.forEach((passage, partIndex) => {
       passage.groups.forEach((group) => {
         group.questions.forEach((q) => {
           questions.push({
@@ -71,6 +94,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
             text: q.text,
             type: q.type,
             options: q.options,
+            correctAnswer: q.correctAnswer,
           });
         });
       });
@@ -86,8 +110,9 @@ const ResultPage = ({ config }: ResultPageProps) => {
       text: string;
       type: string;
       options?: string[];
+      correctAnswer?: string;
     }[] = [];
-    exam.listening?.forEach((section, partIndex) => {
+    exam?.listening?.forEach((section, partIndex) => {
       section.groups.forEach((group) => {
         group.questions.forEach((q) => {
           questions.push({
@@ -97,6 +122,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
             text: q.text,
             type: q.type,
             options: q.options,
+            correctAnswer: q.correctAnswer,
           });
         });
       });
@@ -107,51 +133,97 @@ const ResultPage = ({ config }: ResultPageProps) => {
   const readingQuestions = getReadingQuestions();
   const listeningQuestions = getListeningQuestions();
 
-  // Calculate Reading/Listening scores
-  const calculateObjectiveScore = () => {
-    let correctCount = 0;
-    const totalQuestions = Object.keys(MOCK_ANSWERS).length;
+  // Calculate scores using answer keys from backend
+  const calculateReadingScore = () => {
+    let correct = 0;
+    let total = 0;
 
-    Object.keys(MOCK_ANSWERS).forEach((qId) => {
-      const id = Number(qId);
-      const userAns = (answers[id] || "").toString().trim().toLowerCase();
-      const correctAns = (MOCK_ANSWERS[id] || "")
-        .toString()
-        .trim()
-        .toLowerCase();
-
-      if (userAns === correctAns) {
-        correctCount++;
+    readingQuestions.forEach((q) => {
+      if (q.correctAnswer) {
+        total++;
+        const userAns = (answers[q.id] || "").toString().trim().toLowerCase();
+        const correctAns = q.correctAnswer.toString().trim().toLowerCase();
+        if (userAns === correctAns) {
+          correct++;
+        }
       }
     });
 
-    return { correctCount, totalQuestions };
+    return { correct, total };
   };
 
-  const { correctCount, totalQuestions } = calculateObjectiveScore();
+  const calculateListeningScore = () => {
+    let correct = 0;
+    let total = 0;
+
+    listeningQuestions.forEach((q) => {
+      if (q.correctAnswer) {
+        total++;
+        const userAns = (answers[q.id] || "").toString().trim().toLowerCase();
+        const correctAns = q.correctAnswer.toString().trim().toLowerCase();
+        if (userAns === correctAns) {
+          correct++;
+        }
+      }
+    });
+
+    return { correct, total };
+  };
+
+  const readingResult = calculateReadingScore();
+  const listeningResult = calculateListeningScore();
+
+  // Total objective score (Reading + Listening)
+  const correctCount = readingResult.correct + listeningResult.correct;
+  const totalQuestions = readingResult.total + listeningResult.total;
   const accuracy =
     totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
-  // Calculate individual skill scores (simplified band score calculation)
-  const calculateBandScore = (correct: number, total: number): number => {
-    if (total === 0) return 0;
-    const percentage = (correct / total) * 100;
-    if (percentage >= 90) return 9.0;
-    if (percentage >= 80) return 8.0;
-    if (percentage >= 70) return 7.0;
-    if (percentage >= 60) return 6.0;
-    if (percentage >= 50) return 5.0;
-    if (percentage >= 40) return 4.0;
-    if (percentage >= 30) return 3.0;
+  // IELTS Official Band Score Conversion Tables (Academic)
+  // Based on official IELTS scoring: https://www.ielts.org/
+  const convertToReadingBand = (rawScore: number): number => {
+    // IELTS Academic Reading: 40 questions
+    // This is the official conversion table
+    if (rawScore >= 39) return 9.0;
+    if (rawScore >= 37) return 8.5;
+    if (rawScore >= 35) return 8.0;
+    if (rawScore >= 33) return 7.5;
+    if (rawScore >= 30) return 7.0;
+    if (rawScore >= 27) return 6.5;
+    if (rawScore >= 23) return 6.0;
+    if (rawScore >= 19) return 5.5;
+    if (rawScore >= 15) return 5.0;
+    if (rawScore >= 13) return 4.5;
+    if (rawScore >= 10) return 4.0;
+    if (rawScore >= 8) return 3.5;
+    if (rawScore >= 6) return 3.0;
+    if (rawScore >= 4) return 2.5;
     return 2.0;
   };
 
-  // Mock skill scores (in real app, would calculate from actual responses)
-  const readingScore = calculateBandScore(correctCount, totalQuestions);
-  const listeningScore = calculateBandScore(
-    Math.floor(correctCount * 0.9),
-    totalQuestions
-  );
+  const convertToListeningBand = (rawScore: number): number => {
+    // IELTS Listening: 40 questions
+    // This is the official conversion table
+    if (rawScore >= 39) return 9.0;
+    if (rawScore >= 37) return 8.5;
+    if (rawScore >= 35) return 8.0;
+    if (rawScore >= 32) return 7.5;
+    if (rawScore >= 30) return 7.0;
+    if (rawScore >= 26) return 6.5;
+    if (rawScore >= 23) return 6.0;
+    if (rawScore >= 18) return 5.5;
+    if (rawScore >= 16) return 5.0;
+    if (rawScore >= 13) return 4.5;
+    if (rawScore >= 10) return 4.0;
+    if (rawScore >= 8) return 3.5;
+    if (rawScore >= 6) return 3.0;
+    if (rawScore >= 4) return 2.5;
+    return 2.0;
+  };
+
+  // Calculate band scores
+  const readingScore = convertToReadingBand(readingResult.correct);
+  const listeningScore = convertToListeningBand(listeningResult.correct);
 
   // Writing score (based on word count achievement - simplified)
   const countWords = (text: string): number => {
@@ -273,7 +345,8 @@ const ResultPage = ({ config }: ResultPageProps) => {
               <div className={styles.answerKeyGrid}>
                 {partQuestions.map((q) => {
                   const userAns = answers[q.id] || "";
-                  const correctAns = MOCK_ANSWERS[q.id] || "N/A";
+                  const correctAns =
+                    q.correctAnswer || answerKeyMap[q.id] || "N/A";
                   const isCorrect =
                     userAns.toString().trim().toLowerCase() ===
                     correctAns.toString().trim().toLowerCase();
@@ -304,7 +377,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
   // Render Reading Review with passage
   const renderReadingReview = () => {
-    const passages = exam.reading || [];
+    const passages = exam?.reading || [];
     const currentPassage = passages[activeReadingPart];
 
     if (!currentPassage) {
@@ -328,7 +401,8 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
               {group.questions.map((q) => {
                 const userAns = answers[q.id] || "";
-                const correctAns = MOCK_ANSWERS[q.id] || "N/A";
+                const correctAns =
+                  q.correctAnswer || answerKeyMap[q.id] || "N/A";
                 const isCorrect =
                   userAns.toString().trim().toLowerCase() ===
                   correctAns.toString().trim().toLowerCase();
@@ -461,7 +535,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
   // Render Listening Review with audio
   const renderListeningReview = () => {
-    const sections = exam.listening || [];
+    const sections = exam?.listening || [];
     const currentSection = sections[activeListeningPart];
 
     if (!currentSection) {
@@ -497,7 +571,8 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
               {group.questions.map((q) => {
                 const userAns = answers[q.id] || "";
-                const correctAns = MOCK_ANSWERS[q.id] || "N/A";
+                const correctAns =
+                  q.correctAnswer || answerKeyMap[q.id] || "N/A";
                 const isCorrect =
                   userAns.toString().trim().toLowerCase() ===
                   correctAns.toString().trim().toLowerCase();
