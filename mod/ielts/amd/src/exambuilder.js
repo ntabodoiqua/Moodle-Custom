@@ -81,7 +81,7 @@ define([
    */
   function bindSkillCheckboxes() {
     $(
-      "#id_skill_reading, #id_skill_listening, #id_skill_writing, #id_skill_speaking"
+      "#id_skill_reading, #id_skill_listening, #id_skill_writing, #id_skill_speaking",
     ).on("change", function () {
       updateSkillSections();
       updateBuilderJson();
@@ -98,7 +98,7 @@ define([
       const isChecked = $("#id_skill_" + skill).is(":checked");
       const section = $("#" + skill + "-section");
       const durationWrapper = $(
-        "#duration_" + skill + "_wrapper, #fitem_id_duration_" + skill
+        "#duration_" + skill + "_wrapper, #fitem_id_duration_" + skill,
       );
 
       if (isChecked) {
@@ -210,7 +210,7 @@ define([
       "#ielts-exam-builder input, #ielts-exam-builder textarea, #ielts-exam-builder select",
       function () {
         updateBuilderJson();
-      }
+      },
     );
   }
 
@@ -354,7 +354,7 @@ define([
                         <i class="fa fa-file-text"></i> 
                         <input type="text" class="form-control-plaintext d-inline-block w-auto passage-title" 
                             value="${escapeHtml(
-                              passage.title
+                              passage.title,
                             )}" placeholder="Passage Title">
                     </span>
                     <button type="button" class="btn btn-sm btn-outline-danger delete-item" 
@@ -366,12 +366,12 @@ define([
                     <div class="form-group">
                         <label for="${editorId}">Passage Content (HTML)</label>
                         <div class="editor-wrapper" data-editor-id="${editorId}" data-passage-id="${
-      passage.id
-    }">
+                          passage.id
+                        }">
                             <textarea class="form-control passage-content" id="${editorId}" 
                                 rows="10" 
                                 placeholder="Enter the reading passage content here...">${escapeHtml(
-                                  passage.content
+                                  passage.content,
                                 )}</textarea>
                         </div>
                     </div>
@@ -440,7 +440,7 @@ define([
                 <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
                     <input type="text" class="form-control-plaintext group-title font-weight-bold" 
                         value="${escapeHtml(
-                          group.title
+                          group.title,
                         )}" placeholder="Group Title">
                     <button type="button" class="btn btn-sm btn-outline-danger delete-item" 
                         data-type="group" data-id="${
@@ -466,9 +466,15 @@ define([
             </div>
         `;
 
-    $(
-      `.question-groups-container[data-passage-id="${parentId}"], .question-groups-container[data-section-id="${parentId}"]`
-    ).append(html);
+    // Select the correct container based on skill type
+    let selector;
+    if (skill === "reading") {
+      selector = `.question-groups-container[data-passage-id="${parentId}"]`;
+    } else if (skill === "listening") {
+      selector = `.question-groups-container[data-section-id="${parentId}"]`;
+    }
+
+    $(selector).append(html);
 
     // Render existing questions
     if (group.questions && group.questions.length > 0) {
@@ -536,7 +542,7 @@ define([
         (t) =>
           `<option value="${t.value}" ${
             question.type === t.value ? "selected" : ""
-          }>${t.label}</option>`
+          }>${t.label}</option>`,
       )
       .join("");
 
@@ -553,7 +559,7 @@ define([
                     <div class="col-auto">
                         <input type="text" class="form-control form-control-sm question-number" 
                             value="${escapeHtml(
-                              question.number
+                              question.number,
                             )}" placeholder="#" style="width: 60px;">
                     </div>
                     <div class="col">
@@ -573,7 +579,7 @@ define([
                 <div class="form-group mb-2">
                     <textarea class="form-control form-control-sm question-text" rows="2" 
                         placeholder="Question text...">${escapeHtml(
-                          question.text
+                          question.text,
                         )}</textarea>
                 </div>
                 <div class="options-container">${optionsHtml}</div>
@@ -608,7 +614,7 @@ define([
           container.html("");
         }
         updateBuilderJson();
-      }
+      },
     );
   }
 
@@ -633,8 +639,8 @@ define([
                     </div>
                     <input type="text" class="form-control option-input" data-index="${idx}" 
                         value="${escapeHtml(opt)}" placeholder="Option ${
-        letters[idx] || idx + 1
-      }">
+                          letters[idx] || idx + 1
+                        }">
                 </div>
             `;
     });
@@ -659,7 +665,7 @@ define([
 
       // Re-render options
       const container = $(
-        `.question-item[data-question-id="${questionId}"] .options-container`
+        `.question-item[data-question-id="${questionId}"] .options-container`,
       );
       container.html(renderOptionsEditor(question));
       updateBuilderJson();
@@ -703,7 +709,7 @@ define([
                         <i class="fa fa-headphones"></i> 
                         <input type="text" class="form-control-plaintext d-inline-block w-auto text-white section-title" 
                             value="${escapeHtml(
-                              section.title
+                              section.title,
                             )}" placeholder="Section Title">
                     </span>
                     <button type="button" class="btn btn-sm btn-outline-light delete-item" 
@@ -786,7 +792,7 @@ define([
                         <i class="fa fa-pencil"></i> 
                         <input type="text" class="form-control-plaintext d-inline-block w-auto task-title" 
                             value="${escapeHtml(
-                              task.title
+                              task.title,
                             )}" placeholder="Task Title">
                     </span>
                     <button type="button" class="btn btn-sm btn-outline-dark delete-item" 
@@ -829,7 +835,7 @@ define([
                         <label>Task Prompt (HTML)</label>
                         <textarea class="form-control task-prompt" rows="6" 
                             placeholder="Enter the writing task prompt...">${escapeHtml(
-                              task.prompt
+                              task.prompt,
                             )}</textarea>
                     </div>
                 </div>
@@ -887,7 +893,7 @@ define([
                     </button>
                 </div>
             </div>
-        `
+        `,
       )
       .join("");
 
@@ -898,7 +904,7 @@ define([
                         <i class="fa fa-microphone"></i> 
                         <input type="text" class="form-control-plaintext d-inline-block w-auto text-white part-title" 
                             value="${escapeHtml(
-                              part.title
+                              part.title,
                             )}" placeholder="Part Title">
                     </span>
                     <button type="button" class="btn btn-sm btn-outline-light delete-item" 
@@ -945,7 +951,7 @@ define([
                         <label>Description</label>
                         <textarea class="form-control part-description" rows="2" 
                             placeholder="Part description...">${escapeHtml(
-                              part.description || ""
+                              part.description || "",
                             )}</textarea>
                     </div>
                     <div class="form-group">
@@ -1070,7 +1076,7 @@ define([
             parent.groups.forEach(function (group) {
               if (group.questions) {
                 group.questions = group.questions.filter(
-                  (q) => q.id !== questionId
+                  (q) => q.id !== questionId,
                 );
               }
             });
@@ -1226,7 +1232,7 @@ define([
     if (group.questions) {
       group.questions.forEach(function (question) {
         const questionEl = $(
-          `.question-item[data-question-id="${question.id}"]`
+          `.question-item[data-question-id="${question.id}"]`,
         );
         question.number =
           questionEl.find(".question-number").val() || question.number;
