@@ -99,9 +99,6 @@ function render_exam_page($ielts, $cm, $course, $context) {
     // Output page header.
     echo $OUTPUT->header();
 
-    // Cache busting version.
-    $version = time();
-
     // Inject global MoodleConfig for React app.
     $configjson = json_encode($moodleconfig, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     echo html_writer::script("window.MoodleConfig = {$configjson};");
@@ -112,29 +109,45 @@ function render_exam_page($ielts, $cm, $course, $context) {
         'data-moodle-config' => $configjson,
     ]);
 
+    // Find the correct asset files with hash in filename.
+    $builddir = $CFG->dirroot . '/mod/ielts/build/assets/';
+    $cssfiles = glob($builddir . 'index-*.css');
+    $jsfiles = glob($builddir . 'index-*.js');
+    
+    // Sort to get the main entry file (usually the largest one or by name).
+    // The entry JS file is typically named index-XXXXX.js
+    $mainjs = '';
+    $maincss = '';
+    
+    if (!empty($cssfiles)) {
+        $maincss = basename($cssfiles[0]);
+    }
+    
+    // Find the main entry JS (the one that's loaded directly, not a chunk).
+    // Read from index.html to get the exact file.
+    $indexhtml = file_get_contents($CFG->dirroot . '/mod/ielts/build/index.html');
+    if (preg_match('/src="[^"]*\/assets\/(index-[^"]+\.js)"/', $indexhtml, $matches)) {
+        $mainjs = $matches[1];
+    }
+    if (preg_match('/href="[^"]*\/assets\/(index-[^"]+\.css)"/', $indexhtml, $matches)) {
+        $maincss = $matches[1];
+    }
+
     // Include React build CSS.
-    echo html_writer::tag('link', '', [
-        'rel' => 'stylesheet',
-        'href' => new moodle_url('/mod/ielts/build/assets/index.css', ['v' => $version]),
-    ]);
-
-    // Include vendor chunk first (React, React DOM, React Router).
-    echo html_writer::tag('script', '', [
-        'type' => 'module',
-        'src' => new moodle_url('/mod/ielts/build/assets/vendor.js', ['v' => $version]),
-    ]);
-
-    // Include Ant Design chunk.
-    echo html_writer::tag('script', '', [
-        'type' => 'module',
-        'src' => new moodle_url('/mod/ielts/build/assets/antd.js', ['v' => $version]),
-    ]);
+    if ($maincss) {
+        echo html_writer::tag('link', '', [
+            'rel' => 'stylesheet',
+            'href' => new moodle_url('/mod/ielts/build/assets/' . $maincss),
+        ]);
+    }
 
     // Include main React bundle.
-    echo html_writer::tag('script', '', [
-        'type' => 'module',
-        'src' => new moodle_url('/mod/ielts/build/assets/index.js', ['v' => $version]),
-    ]);
+    if ($mainjs) {
+        echo html_writer::tag('script', '', [
+            'type' => 'module',
+            'src' => new moodle_url('/mod/ielts/build/assets/' . $mainjs),
+        ]);
+    }
 
     // Output page footer.
     echo $OUTPUT->footer();

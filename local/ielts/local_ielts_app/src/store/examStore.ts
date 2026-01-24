@@ -133,7 +133,7 @@ export const useExamStore = create<ExamState>((set, get) => ({
       if (!state.endTime) return { timeLeft: 0 };
       const remaining = Math.max(
         0,
-        Math.floor((state.endTime - Date.now()) / 1000)
+        Math.floor((state.endTime - Date.now()) / 1000),
       );
       return { timeLeft: remaining };
     }),
@@ -161,16 +161,23 @@ export const useExamStore = create<ExamState>((set, get) => ({
       const examData = await fetchExamById(id);
 
       if (examData) {
+        const currentState = get();
+        // Only reset answers/submission if loading a different exam
+        const isNewExam = currentState.currentExamId !== id;
         set({
           examData,
           currentExamId: id,
           isLoading: false,
           error: null,
-          // Reset answers when loading new exam
-          answers: {},
-          writingEssays: {},
-          speakingAudio: {},
-          isSubmitted: false,
+          // Only reset answers when loading a NEW exam (not when re-loading same exam)
+          ...(isNewExam
+            ? {
+                answers: {},
+                writingEssays: {},
+                speakingAudio: {},
+                isSubmitted: false,
+              }
+            : {}),
         });
       } else {
         set({

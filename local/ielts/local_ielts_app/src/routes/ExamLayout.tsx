@@ -1,5 +1,11 @@
 import { useEffect, useState, Suspense, useMemo, useRef } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 import { Layout, Button, Spin, Modal, message } from "antd";
 import {
   UserOutlined,
@@ -29,6 +35,7 @@ interface ExamLayoutProps {
 
 const ExamLayout = ({ config }: ExamLayoutProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     examData,
     currentSkill,
@@ -63,7 +70,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
   // Get available skills from exam data
   const availableSkills = useMemo(
     () => getAvailableSkills(examData),
-    [examData]
+    [examData],
   );
 
   // Check if current skill is the last available skill
@@ -75,6 +82,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
   // 1. INIT: Load exam data from API (only after API is initialized)
   useEffect(() => {
     if (!isApiInitialized) return; // Wait for API to be initialized
+    if (isSubmitted && !isReviewMode) return; // Don't re-init after submission
 
     const initExam = async () => {
       // Get exam ID from MoodleConfig (instanceId)
@@ -82,14 +90,14 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
         config.instanceId ||
         parseInt(
           new URLSearchParams(window.location.search).get("examid") || "1",
-          10
+          10,
         );
 
       // If in review mode, first load exam data, then set review state
       if (isReviewMode && config.attemptData) {
         console.log(
           "Review mode: Loading exam and attempt data",
-          config.attemptId
+          config.attemptId,
         );
 
         // Load exam data first (needed for displaying questions in ResultPage)
@@ -112,6 +120,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     };
 
     initExam();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isApiInitialized,
     loadExam,
@@ -120,7 +129,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     config.attemptData,
     config.attemptId,
     setReviewMode,
-    navigate,
+    // Note: navigate and isSubmitted intentionally excluded to prevent re-init after submit
   ]);
 
   // Helper to get duration - uses examData.durations per skill, with fallback to defaults
@@ -130,7 +139,8 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
 
   // 2. Set initial skill and timer when exam loads
   useEffect(() => {
-    if (loading || !examData || availableSkills.length === 0) return;
+    if (loading || isSubmitted || !examData || availableSkills.length === 0)
+      return;
 
     // If current skill is not available in this exam, switch to first available
     if (!availableSkills.includes(currentSkill)) {
@@ -140,7 +150,15 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
       // Current skill is available but timer not set yet - initialize it
       setSkill(currentSkill, getEffectiveDuration(currentSkill));
     }
-  }, [loading, examData, availableSkills, currentSkill, setSkill, timeLeft]);
+  }, [
+    loading,
+    isSubmitted,
+    examData,
+    availableSkills,
+    currentSkill,
+    setSkill,
+    timeLeft,
+  ]);
 
   // 3. TIMER: Update timeLeft based on endTime (accurate even after tab switch)
   useEffect(() => {
@@ -182,7 +200,10 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
 
   // Navigate based on current skill (only if skill is available)
   useEffect(() => {
+    // Don't navigate if already submitted or on result page
     if (loading || isSubmitted) return;
+    // CRITICAL: Don't navigate away from result page
+    if (location.pathname === ROUTES.RESULT) return;
     if (!availableSkills.includes(currentSkill)) return;
 
     const routeMap: Record<SkillType, string> = {
@@ -196,7 +217,14 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     if (targetRoute) {
       navigate(targetRoute, { replace: true });
     }
-  }, [currentSkill, loading, isSubmitted, navigate, availableSkills]);
+  }, [
+    currentSkill,
+    loading,
+    isSubmitted,
+    navigate,
+    availableSkills,
+    location.pathname,
+  ]);
 
   const handleTimeOut = () => {
     message.warning("Time's up for this section!");
@@ -228,7 +256,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
 
         if (attemptId) {
           message.success(
-            `Exam submitted successfully! (Attempt #${attemptId})`
+            `Exam submitted successfully! (Attempt #${attemptId})`,
           );
         } else {
           // Fallback: just mark as submitted locally
