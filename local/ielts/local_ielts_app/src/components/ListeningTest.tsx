@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Select, Slider, Button, Empty } from "antd";
+import { Slider, Button, Empty } from "antd";
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   SoundOutlined,
 } from "@ant-design/icons";
 import { useExamStore } from "../store/examStore";
+import QuestionRenderer from "./QuestionRenderer";
 import styles from "./ListeningTest.module.css";
 
 interface ListeningTestProps {
@@ -100,11 +101,6 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
     return `${mins.toString().padStart(2, "0")}:${secs
       .toString()
       .padStart(2, "0")}`;
-  };
-
-  // Determine input type based on question type
-  const isDropdown = (type: string) => {
-    return type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE";
   };
 
   if (!examData || sections.length === 0) {
@@ -232,28 +228,11 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
                       dangerouslySetInnerHTML={{ __html: question.text }}
                     />
 
-                    {isDropdown(question.type) && question.options ? (
-                      <Select
-                        className={styles.answerSelect}
-                        placeholder="Select answer"
-                        value={answers[question.id] || undefined}
-                        onChange={(value) => onAnswerChange(question.id, value)}
-                        options={question.options.map((opt) => ({
-                          label: opt,
-                          value: opt,
-                        }))}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        className={styles.answerInput}
-                        placeholder="Type your answer"
-                        value={answers[question.id] || ""}
-                        onChange={(e) =>
-                          onAnswerChange(question.id, e.target.value)
-                        }
-                      />
-                    )}
+                    <QuestionRenderer
+                      question={question}
+                      answer={answers[question.id]}
+                      onAnswerChange={onAnswerChange}
+                    />
                   </div>
                 </div>
               ))}
@@ -297,10 +276,10 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
             if (index === currentSectionIndex) return null;
             const sectionQuestionIds: number[] = [];
             section.groups.forEach((g) =>
-              g.questions.forEach((q) => sectionQuestionIds.push(q.id))
+              g.questions.forEach((q) => sectionQuestionIds.push(q.id)),
             );
             const answered = sectionQuestionIds.filter(
-              (id) => answers[id]
+              (id) => answers[id],
             ).length;
             return (
               <div key={index} className={styles.progressItem}>

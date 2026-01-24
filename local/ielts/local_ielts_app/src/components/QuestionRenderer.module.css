@@ -1,0 +1,84 @@
+.answerSelect {
+  width: 100%;
+  min-width: 200px;
+}
+
+.answerInput {
+  width: 100%;
+  max-width: 300px;
+}
+
+/* Multiple Choice Multi */
+.multiChoiceContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.multiChoiceHint {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.checkboxGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkboxItem {
+  margin: 0 !important;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.checkboxItem:hover {
+  background: #e9ecef;
+}
+
+/* Radio Group for True/False and Yes/No */
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radioItem {
+  margin: 0 !important;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.radioItem:hover {
+  background: #e9ecef;
+}
+
+/* Matching items display */
+.matchItemsList {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.matchItemsList h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.matchItem {
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.matchItemLabel {
+  font-weight: 600;
+  color: #1890ff;
+  margin-right: 8px;
+}

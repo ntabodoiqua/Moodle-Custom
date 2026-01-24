@@ -44,11 +44,22 @@ define([
 
   // Question types
   const questionTypes = [
-    { value: "MULTIPLE_CHOICE", label: "Multiple Choice" },
+    { value: "MULTIPLE_CHOICE", label: "Multiple Choice (Single Answer)" },
+    {
+      value: "MULTIPLE_CHOICE_MULTI",
+      label: "Multiple Choice (Multiple Answers)",
+    },
     { value: "TRUE_FALSE", label: "True/False/Not Given" },
-    { value: "GAP_FILL", label: "Gap Fill" },
-    { value: "MATCHING", label: "Matching" },
-    { value: "MAP_LABELING", label: "Map Labeling" },
+    { value: "YES_NO", label: "Yes/No/Not Given" },
+    { value: "GAP_FILL", label: "Gap Fill / Sentence Completion" },
+    { value: "MATCHING", label: "Matching (General)" },
+    { value: "MATCHING_HEADINGS", label: "Matching Headings" },
+    { value: "MATCHING_INFORMATION", label: "Matching Information" },
+    { value: "MATCHING_FEATURES", label: "Matching Features" },
+    { value: "MATCHING_SENTENCE_ENDINGS", label: "Matching Sentence Endings" },
+    { value: "MAP_LABELING", label: "Map/Diagram Labeling" },
+    { value: "SHORT_ANSWER", label: "Short Answer" },
+    { value: "SUMMARY_COMPLETION", label: "Summary Completion" },
   ];
 
   /**
@@ -166,6 +177,45 @@ define([
       e.preventDefault();
       const questionId = $(this).data("question-id");
       addOption(questionId);
+    });
+
+    // Add match item for matching questions
+    $(document).on("click", ".add-match-item", function (e) {
+      e.preventDefault();
+      const questionId = $(this).data("question-id");
+      addMatchItem(questionId);
+    });
+
+    // Remove match item
+    $(document).on("click", ".remove-match-item", function (e) {
+      e.preventDefault();
+      const questionItem = $(this).closest(".question-item");
+      const questionId = questionItem.data("question-id");
+      const index = $(this).data("index");
+      removeMatchItem(questionId, index);
+    });
+
+    // Update numCorrect for multiple answer questions
+    $(document).on("change", ".num-correct", function () {
+      const questionItem = $(this).closest(".question-item");
+      const questionId = questionItem.data("question-id");
+      const question = findQuestionById(questionId);
+      if (question) {
+        question.numCorrect = parseInt($(this).val(), 10);
+        updateBuilderJson();
+      }
+    });
+
+    // Update match items on input
+    $(document).on("input", ".match-item-input", function () {
+      const questionItem = $(this).closest(".question-item");
+      const questionId = questionItem.data("question-id");
+      const index = $(this).data("index");
+      const question = findQuestionById(questionId);
+      if (question && question.matchItems) {
+        question.matchItems[index] = $(this).val();
+        updateBuilderJson();
+      }
     });
 
     // Add speaking question
@@ -546,10 +596,7 @@ define([
       )
       .join("");
 
-    const optionsHtml =
-      question.type === "MULTIPLE_CHOICE" || question.type === "TRUE_FALSE"
-        ? renderOptionsEditor(question)
-        : "";
+    const optionsHtml = renderQuestionTypeEditor(question);
 
     const html = `
             <div class="question-item border rounded p-2 mb-2" data-question-id="${
@@ -603,19 +650,212 @@ define([
           .closest(".question-item")
           .find(".options-container");
 
-        if (newType === "MULTIPLE_CHOICE") {
-          question.options = ["", "", "", ""];
-          container.html(renderOptionsEditor(question));
-        } else if (newType === "TRUE_FALSE") {
-          question.options = ["TRUE", "FALSE", "NOT GIVEN"];
-          container.html(renderOptionsEditor(question));
-        } else {
-          question.options = [];
-          container.html("");
-        }
+        // Initialize default values based on type
+        initializeQuestionByType(question, newType);
+
+        // Re-render the type-specific editor
+        container.html(renderQuestionTypeEditor(question));
         updateBuilderJson();
       },
     );
+  }
+
+  /**
+   * Initialize question default values based on type
+   */
+  function initializeQuestionByType(question, type) {
+    switch (type) {
+      case "MULTIPLE_CHOICE":
+        question.options =
+          question.options && question.options.length > 0
+            ? question.options
+            : ["", "", "", ""];
+        break;
+      case "MULTIPLE_CHOICE_MULTI":
+        question.options =
+          question.options && question.options.length > 0
+            ? question.options
+            : ["", "", "", "", "", ""];
+        question.numCorrect = question.numCorrect || 2;
+        break;
+      case "TRUE_FALSE":
+        question.options = ["TRUE", "FALSE", "NOT GIVEN"];
+        break;
+      case "YES_NO":
+        question.options = ["YES", "NO", "NOT GIVEN"];
+        break;
+      case "MATCHING_HEADINGS":
+      case "MATCHING_INFORMATION":
+      case "MATCHING_FEATURES":
+      case "MATCHING_SENTENCE_ENDINGS":
+      case "MATCHING":
+        question.matchItems = question.matchItems || ["", "", "", ""];
+        break;
+      case "GAP_FILL":
+      case "SHORT_ANSWER":
+      case "SUMMARY_COMPLETION":
+      case "MAP_LABELING":
+      default:
+        question.options = [];
+        break;
+    }
+  }
+
+  /**
+   * Render type-specific editor for a question
+   */
+  function renderQuestionTypeEditor(question) {
+    const type = question.type;
+
+    switch (type) {
+      case "MULTIPLE_CHOICE":
+      case "TRUE_FALSE":
+      case "YES_NO":
+        return renderOptionsEditor(question);
+
+      case "MULTIPLE_CHOICE_MULTI":
+        return renderMultipleAnswerEditor(question);
+
+      case "MATCHING_HEADINGS":
+        return renderMatchingEditor(
+          question,
+          "Heading",
+          "Enter heading options that can be matched to paragraphs",
+        );
+
+      case "MATCHING_INFORMATION":
+        return renderMatchingEditor(
+          question,
+          "Paragraph",
+          "Enter paragraph labels (A, B, C...) or descriptions",
+        );
+
+      case "MATCHING_FEATURES":
+        return renderMatchingEditor(
+          question,
+          "Feature/Person",
+          "Enter names or features to match",
+        );
+
+      case "MATCHING_SENTENCE_ENDINGS":
+        return renderMatchingEditor(
+          question,
+          "Ending",
+          "Enter sentence endings to match",
+        );
+
+      case "MATCHING":
+        return renderMatchingEditor(question, "Item", "Enter items to match");
+
+      case "GAP_FILL":
+      case "SHORT_ANSWER":
+      case "SUMMARY_COMPLETION":
+      case "MAP_LABELING":
+      default:
+        return renderSimpleAnswerHint(question);
+    }
+  }
+
+  /**
+   * Render editor for multiple choice with multiple answers
+   */
+  function renderMultipleAnswerEditor(question) {
+    if (!question.options || question.options.length === 0) {
+      question.options = ["", "", "", "", "", ""];
+    }
+
+    const letters = ["A", "B", "C", "D", "E", "F", "G", "H"];
+    let html = `
+      <div class="alert alert-info py-1 px-2 mb-2" style="font-size: 12px;">
+        <i class="fa fa-info-circle"></i> Multiple answers: Enter comma-separated correct answers (e.g., "A, C, E")
+      </div>
+      <div class="form-group mb-2">
+        <label class="small">How many correct answers?</label>
+        <select class="form-control form-control-sm num-correct" style="width: 80px;">
+          <option value="2" ${question.numCorrect === 2 ? "selected" : ""}>2</option>
+          <option value="3" ${question.numCorrect === 3 ? "selected" : ""}>3</option>
+        </select>
+      </div>
+      <div class="options-list mb-2">`;
+
+    question.options.forEach((opt, idx) => {
+      html += `
+        <div class="input-group input-group-sm mb-1">
+          <div class="input-group-prepend">
+            <span class="input-group-text">${letters[idx] || idx + 1}</span>
+          </div>
+          <input type="text" class="form-control option-input" data-index="${idx}" 
+            value="${escapeHtml(opt)}" placeholder="Option ${letters[idx] || idx + 1}">
+        </div>`;
+    });
+
+    html += `</div>
+      <button type="button" class="btn btn-xs btn-link add-option" data-question-id="${question.id}">
+        + Add Option
+      </button>`;
+
+    return html;
+  }
+
+  /**
+   * Render editor for matching type questions
+   */
+  function renderMatchingEditor(question, itemLabel, helpText) {
+    if (!question.matchItems || question.matchItems.length === 0) {
+      question.matchItems = ["", "", "", ""];
+    }
+
+    const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+    let html = `
+      <div class="alert alert-info py-1 px-2 mb-2" style="font-size: 12px;">
+        <i class="fa fa-info-circle"></i> ${helpText}
+      </div>
+      <label class="small font-weight-bold">${itemLabel} Options:</label>
+      <div class="match-items-list mb-2">`;
+
+    question.matchItems.forEach((item, idx) => {
+      html += `
+        <div class="input-group input-group-sm mb-1">
+          <div class="input-group-prepend">
+            <span class="input-group-text">${letters[idx] || idx + 1}</span>
+          </div>
+          <input type="text" class="form-control match-item-input" data-index="${idx}" 
+            value="${escapeHtml(item)}" placeholder="${itemLabel} ${letters[idx] || idx + 1}">
+          <div class="input-group-append">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-match-item" data-index="${idx}">
+              <i class="fa fa-times"></i>
+            </button>
+          </div>
+        </div>`;
+    });
+
+    html += `</div>
+      <button type="button" class="btn btn-xs btn-link add-match-item" data-question-id="${question.id}">
+        + Add ${itemLabel}
+      </button>`;
+
+    return html;
+  }
+
+  /**
+   * Render hint for simple answer types
+   */
+  function renderSimpleAnswerHint(question) {
+    const hints = {
+      GAP_FILL:
+        "Enter the exact word(s) that fill the gap. For multiple acceptable answers, separate with | (e.g., 'answer1|answer2')",
+      SHORT_ANSWER:
+        "Enter the correct short answer. For multiple acceptable answers, separate with | (e.g., 'yes|correct')",
+      SUMMARY_COMPLETION: "Enter the word(s) that complete the summary",
+      MAP_LABELING: "Enter the correct label/letter for this location",
+    };
+
+    const hint = hints[question.type] || "Enter the correct answer";
+
+    return `
+      <div class="alert alert-secondary py-1 px-2 mb-0" style="font-size: 12px;">
+        <i class="fa fa-lightbulb-o"></i> ${hint}
+      </div>`;
   }
 
   /**
@@ -667,7 +907,42 @@ define([
       const container = $(
         `.question-item[data-question-id="${questionId}"] .options-container`,
       );
-      container.html(renderOptionsEditor(question));
+      container.html(renderQuestionTypeEditor(question));
+      updateBuilderJson();
+    }
+  }
+
+  /**
+   * Add match item to a matching question
+   */
+  function addMatchItem(questionId) {
+    let question = findQuestionById(questionId);
+    if (question) {
+      if (!question.matchItems) question.matchItems = [];
+      question.matchItems.push("");
+
+      // Re-render the editor
+      const container = $(
+        `.question-item[data-question-id="${questionId}"] .options-container`,
+      );
+      container.html(renderQuestionTypeEditor(question));
+      updateBuilderJson();
+    }
+  }
+
+  /**
+   * Remove match item from a matching question
+   */
+  function removeMatchItem(questionId, index) {
+    let question = findQuestionById(questionId);
+    if (question && question.matchItems && question.matchItems.length > 1) {
+      question.matchItems.splice(index, 1);
+
+      // Re-render the editor
+      const container = $(
+        `.question-item[data-question-id="${questionId}"] .options-container`,
+      );
+      container.html(renderQuestionTypeEditor(question));
       updateBuilderJson();
     }
   }
@@ -1242,14 +1517,39 @@ define([
         question.correctAnswer =
           questionEl.find(".question-answer").val() || "";
 
-        // Update options
+        // Update data based on question type
+        const type = question.type;
+
+        // Options for multiple choice types
         if (
-          question.type === "MULTIPLE_CHOICE" ||
-          question.type === "TRUE_FALSE"
+          type === "MULTIPLE_CHOICE" ||
+          type === "MULTIPLE_CHOICE_MULTI" ||
+          type === "TRUE_FALSE" ||
+          type === "YES_NO"
         ) {
           question.options = [];
           questionEl.find(".option-input").each(function () {
             question.options.push($(this).val());
+          });
+
+          // For multiple answer questions, also save numCorrect
+          if (type === "MULTIPLE_CHOICE_MULTI") {
+            question.numCorrect =
+              parseInt(questionEl.find(".num-correct").val()) || 2;
+          }
+        }
+
+        // Match items for matching types
+        if (
+          type === "MATCHING" ||
+          type === "MATCHING_HEADINGS" ||
+          type === "MATCHING_INFORMATION" ||
+          type === "MATCHING_FEATURES" ||
+          type === "MATCHING_SENTENCE_ENDINGS"
+        ) {
+          question.matchItems = [];
+          questionEl.find(".match-item-input").each(function () {
+            question.matchItems.push($(this).val());
           });
         }
       });

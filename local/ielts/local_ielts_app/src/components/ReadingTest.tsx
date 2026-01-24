@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { Select, Empty } from "antd";
+import { Empty } from "antd";
 import { useExamStore } from "../store/examStore";
+import QuestionRenderer from "./QuestionRenderer";
 import styles from "./ReadingTest.module.css";
 
 interface ReadingTestProps {
@@ -42,11 +43,6 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
         block: "center",
       });
     }
-  };
-
-  // Determine input type based on question type
-  const isDropdown = (type: string) => {
-    return type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE";
   };
 
   if (!examData || passages.length === 0) {
@@ -110,28 +106,11 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
                       dangerouslySetInnerHTML={{ __html: question.text }}
                     />
 
-                    {isDropdown(question.type) && question.options ? (
-                      <Select
-                        className={styles.answerSelect}
-                        placeholder="Select answer"
-                        value={answers[question.id] || undefined}
-                        onChange={(value) => onAnswerChange(question.id, value)}
-                        options={question.options.map((opt) => ({
-                          label: opt,
-                          value: opt,
-                        }))}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        className={styles.answerInput}
-                        placeholder="Type your answer"
-                        value={answers[question.id] || ""}
-                        onChange={(e) =>
-                          onAnswerChange(question.id, e.target.value)
-                        }
-                      />
-                    )}
+                    <QuestionRenderer
+                      question={question}
+                      answer={answers[question.id]}
+                      onAnswerChange={onAnswerChange}
+                    />
                   </div>
                 </div>
               ))}
@@ -175,10 +154,10 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
             if (index === currentPart) return null;
             const passageQuestionIds: number[] = [];
             passage.groups.forEach((g) =>
-              g.questions.forEach((q) => passageQuestionIds.push(q.id))
+              g.questions.forEach((q) => passageQuestionIds.push(q.id)),
             );
             const answered = passageQuestionIds.filter(
-              (id) => answers[id]
+              (id) => answers[id],
             ).length;
             return (
               <div key={index} className={styles.progressItem}>

@@ -35,18 +35,30 @@ export interface MoodleConfig {
 // --- COMMON (Dùng chung) ---
 export type SkillType = "READING" | "LISTENING" | "WRITING" | "SPEAKING";
 
+export type QuestionType =
+  | "MULTIPLE_CHOICE"
+  | "MULTIPLE_CHOICE_MULTI"
+  | "TRUE_FALSE"
+  | "YES_NO"
+  | "GAP_FILL"
+  | "MATCHING"
+  | "MATCHING_HEADINGS"
+  | "MATCHING_INFORMATION"
+  | "MATCHING_FEATURES"
+  | "MATCHING_SENTENCE_ENDINGS"
+  | "MAP_LABELING"
+  | "SHORT_ANSWER"
+  | "SUMMARY_COMPLETION";
+
 export interface Question {
   id: number;
   number: string; // Vd: "1", "2", "3-5"
   text: string; // Nội dung câu hỏi
-  type:
-    | "MULTIPLE_CHOICE"
-    | "TRUE_FALSE"
-    | "GAP_FILL"
-    | "MATCHING"
-    | "MAP_LABELING";
+  type: QuestionType;
   options?: string[]; // Cho trắc nghiệm
-  correctAnswer?: string; // Đáp án đúng
+  matchItems?: string[]; // Cho matching types (list of items to match)
+  numCorrect?: number; // Số đáp án đúng cho MULTIPLE_CHOICE_MULTI
+  correctAnswer?: string; // Đáp án đúng (có thể là "A,B,C" cho multi)
   explanation?: string; // Giải thích đáp án
   referenceText?: string; // Đoạn văn tham chiếu (cho Reading)
 }
@@ -151,7 +163,7 @@ export const getAvailableSkills = (examData: ExamData | null): SkillType[] => {
  */
 export const getNextSkill = (
   currentSkill: SkillType,
-  availableSkills: SkillType[]
+  availableSkills: SkillType[],
 ): SkillType | null => {
   const currentIndex = availableSkills.indexOf(currentSkill);
   if (currentIndex === -1 || currentIndex === availableSkills.length - 1) {
@@ -177,7 +189,7 @@ export const DEFAULT_SKILL_DURATIONS: Record<SkillType, number> = {
  */
 export const getSkillDuration = (
   skill: SkillType,
-  examData?: ExamData | null
+  examData?: ExamData | null,
 ): number => {
   // 1. Try to get from examData.durations
   if (examData?.durations) {
@@ -197,7 +209,7 @@ export const getSkillDuration = (
  */
 export const hasSkillData = (
   examData: ExamData | null,
-  skill: SkillType
+  skill: SkillType,
 ): boolean => {
   if (!examData) return false;
 
