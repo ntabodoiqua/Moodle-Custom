@@ -171,9 +171,10 @@ const ResultPage = ({ config }: ResultPageProps) => {
         } else {
           // Normal questions
           group.questions.forEach((q) => {
+            const displayNum = q.number ? parseInt(q.number, 10) : q.id;
             questions.push({
               id: q.id,
-              displayNumber: q.id,
+              displayNumber: displayNum,
               partIndex,
               groupTitle: group.title,
               text: q.text,
@@ -221,9 +222,10 @@ const ResultPage = ({ config }: ResultPageProps) => {
         } else {
           // Normal questions
           group.questions.forEach((q) => {
+            const displayNum = q.number ? parseInt(q.number, 10) : q.id;
             questions.push({
               id: q.id,
-              displayNumber: q.id,
+              displayNumber: displayNum,
               partIndex,
               groupTitle: group.title,
               text: q.text,
@@ -553,10 +555,13 @@ const ResultPage = ({ config }: ResultPageProps) => {
                       options: undefined,
                     };
                   })
-                : group.questions.map((q) => ({
-                    ...q,
-                    displayNumber: q.id,
-                  }));
+                : group.questions.map((q) => {
+                    const displayNum = q.number ? parseInt(q.number, 10) : q.id;
+                    return {
+                      ...q,
+                      displayNumber: displayNum,
+                    };
+                  });
 
             return (
               <div key={group.id} className={styles.questionGroup}>
@@ -755,10 +760,13 @@ const ResultPage = ({ config }: ResultPageProps) => {
                       options: undefined,
                     };
                   })
-                : group.questions.map((q) => ({
-                    ...q,
-                    displayNumber: q.id,
-                  }));
+                : group.questions.map((q) => {
+                    const displayNum = q.number ? parseInt(q.number, 10) : q.id;
+                    return {
+                      ...q,
+                      displayNumber: displayNum,
+                    };
+                  });
 
             return (
               <div key={group.id} className={styles.questionGroup}>

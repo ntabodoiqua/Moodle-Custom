@@ -353,32 +353,46 @@ define([
       }
     });
 
-    // Update table cell
+    // Update table cell - use debounce to prevent focus loss
+    let tableCellDebounceTimer = null;
     $(document).on("input", ".table-cell-input", function () {
-      const tableEditor = $(this).closest(".table-editor");
+      const input = $(this);
+      const tableEditor = input.closest(".table-editor");
       const groupId = tableEditor.data("group-id");
-      const rowIdx = parseInt($(this).data("row"), 10);
-      const colIdx = parseInt($(this).data("col"), 10);
+      const rowIdx = parseInt(input.data("row"), 10);
+      const colIdx = parseInt(input.data("col"), 10);
 
       const group = findGroupById(groupId);
       if (group && group.tableData) {
-        group.tableData.rows[rowIdx][colIdx] = $(this).val();
-
-        // Update questions list based on cell content
-        updateTableQuestions(group);
-
-        // Find which skill this group belongs to and recalculate numbers
-        const skill = findSkillForGroup(groupId);
-        if (skill) {
-          recalculateQuestionNumbers(skill);
-          showQuestionNumberingSummary();
-        }
-
-        // Re-render the questions section
-        const questionsSection = tableEditor.find(".table-questions-list");
-        questionsSection.html(renderTableQuestionsEditor(group));
-
+        // Update data immediately
+        group.tableData.rows[rowIdx][colIdx] = input.val();
         updateBuilderJson();
+
+        // Debounce the heavy operations (question parsing and re-rendering)
+        clearTimeout(tableCellDebounceTimer);
+        tableCellDebounceTimer = setTimeout(function () {
+          // Check if the cell content contains question pattern [n]
+          const cellValue = input.val();
+          const hasQuestionPattern = /\[\d+\]/.test(cellValue);
+
+          // Only update questions if there's a question pattern
+          if (hasQuestionPattern || cellValue === "") {
+            updateTableQuestions(group);
+
+            // Find which skill this group belongs to and recalculate numbers
+            const skill = findSkillForGroup(groupId);
+            if (skill) {
+              recalculateQuestionNumbers(skill);
+              showQuestionNumberingSummary();
+            }
+
+            // Re-render the questions section only
+            const questionsSection = tableEditor.find(".table-questions-list");
+            questionsSection.html(renderTableQuestionsEditor(group));
+
+            updateBuilderJson();
+          }
+        }, 500); // Wait 500ms after typing stops
       }
     });
 
@@ -1372,10 +1386,12 @@ define([
     const questionNumbers = parseTableQuestionNumbers(group.tableData);
     const existingByNumber = {};
 
-    // Preserve existing answers by number
+    // Preserve existing answers by number (support both old and new format)
     if (group.tableData.questions) {
-      group.tableData.questions.forEach((q) => {
-        existingByNumber[q.number] = {
+      group.tableData.questions.forEach((q, index) => {
+        // For old format without number field, use the index+1 or infer from cell position
+        const displayNum = q.number !== undefined ? q.number : index + 1;
+        existingByNumber[displayNum] = {
           id: q.id,
           correctAnswer: q.correctAnswer || "",
         };

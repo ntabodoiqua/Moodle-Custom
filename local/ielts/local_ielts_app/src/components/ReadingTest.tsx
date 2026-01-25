@@ -34,7 +34,8 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
       } else {
         // Normal questions
         group.questions.forEach((q) => {
-          questions.push({ id: q.id, displayNumber: q.id });
+          const displayNum = q.number ? parseInt(q.number, 10) : q.id;
+          questions.push({ id: q.id, displayNumber: displayNum });
         });
       }
     });
@@ -123,7 +124,9 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
                     id={`question-${question.id}`}
                     className={styles.question}
                   >
-                    <div className={styles.questionNumber}>{question.id}.</div>
+                    <div className={styles.questionNumber}>
+                      {question.number}.
+                    </div>
                     <div className={styles.questionContent}>
                       <div
                         className={styles.questionText}

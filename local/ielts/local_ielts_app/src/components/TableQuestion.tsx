@@ -26,16 +26,32 @@ const parseCell = (
   return { isQuestion: false, questionNumber: null, text: cellContent };
 };
 
-// Build a map from display number to actual question ID
+// Build a map from display number (from cell content) to actual question ID
 const buildQuestionIdMap = (tableData: TableData): Map<number, number> => {
   const map = new Map<number, number>();
-  if (tableData.questions) {
-    tableData.questions.forEach((q) => {
-      // Support both new format (with number) and old format (id as number)
-      const displayNum = q.number !== undefined ? q.number : q.id;
-      map.set(displayNum, q.id);
+
+  // First, extract display numbers from cells in order
+  const displayNumbersFromCells: number[] = [];
+  tableData.rows.forEach((row) => {
+    row.forEach((cell) => {
+      const questionNumber = extractQuestionNumber(cell.trim());
+      if (questionNumber !== null) {
+        displayNumbersFromCells.push(questionNumber);
+      }
+    });
+  });
+  displayNumbersFromCells.sort((a, b) => a - b);
+
+  // Map each display number to corresponding question ID
+  if (tableData.questions && tableData.questions.length > 0) {
+    displayNumbersFromCells.forEach((displayNum, index) => {
+      const questionObj = tableData.questions![index];
+      if (questionObj) {
+        map.set(displayNum, questionObj.id);
+      }
     });
   }
+
   return map;
 };
 
@@ -139,28 +155,46 @@ export interface QuestionInfo {
 export const extractTableQuestionInfo = (
   tableData: TableData,
 ): QuestionInfo[] => {
-  // If questions array exists with proper structure
-  if (tableData.questions && tableData.questions.length > 0) {
-    return tableData.questions
-      .map((q) => ({
-        id: q.id,
-        displayNumber: q.number !== undefined ? q.number : q.id,
-      }))
-      .sort((a, b) => a.displayNumber - b.displayNumber);
-  }
-
-  // Fallback: extract from cell content (for backward compatibility)
-  const questions: QuestionInfo[] = [];
+  // First, extract display numbers from cell content (e.g., [1], [2], [3])
+  // This is the source of truth for display numbers
+  const displayNumbersFromCells: number[] = [];
   tableData.rows.forEach((row) => {
     row.forEach((cell) => {
       const questionNumber = extractQuestionNumber(cell.trim());
       if (questionNumber !== null) {
-        questions.push({ id: questionNumber, displayNumber: questionNumber });
+        displayNumbersFromCells.push(questionNumber);
       }
     });
   });
+  displayNumbersFromCells.sort((a, b) => a - b);
 
-  return questions.sort((a, b) => a.displayNumber - b.displayNumber);
+  // If questions array exists, map display numbers to actual IDs
+  if (tableData.questions && tableData.questions.length > 0) {
+    // Build a map: array index -> question object
+    // Questions array should be in same order as display numbers
+    return displayNumbersFromCells
+      .map((displayNum, index) => {
+        const questionObj = tableData.questions![index];
+        if (questionObj) {
+          return {
+            id: questionObj.id,
+            displayNumber:
+              questionObj.number !== undefined
+                ? questionObj.number
+                : displayNum,
+          };
+        }
+        // Fallback if no matching question object
+        return { id: displayNum, displayNumber: displayNum };
+      })
+      .sort((a, b) => a.displayNumber - b.displayNumber);
+  }
+
+  // Fallback: use display numbers as IDs (for backward compatibility)
+  return displayNumbersFromCells.map((num) => ({
+    id: num,
+    displayNumber: num,
+  }));
 };
 
 export default TableQuestion;

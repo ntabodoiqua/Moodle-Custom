@@ -47,7 +47,8 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
       } else {
         // Normal questions
         group.questions.forEach((q) => {
-          questions.push({ id: q.id, displayNumber: q.id });
+          const displayNum = q.number ? parseInt(q.number, 10) : q.id;
+          questions.push({ id: q.id, displayNumber: displayNum });
         });
       }
     });
@@ -245,7 +246,9 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
                     id={`listening-question-${question.id}`}
                     className={styles.question}
                   >
-                    <div className={styles.questionNumber}>{question.id}.</div>
+                    <div className={styles.questionNumber}>
+                      {question.number}.
+                    </div>
                     <div className={styles.questionContent}>
                       <div
                         className={styles.questionText}
