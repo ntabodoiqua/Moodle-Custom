@@ -2,7 +2,11 @@ import { useState, useEffect, useMemo } from "react";
 import { Empty } from "antd";
 import { useExamStore } from "../store/examStore";
 import QuestionRenderer from "./QuestionRenderer";
-import TableQuestion, { extractTableQuestionIds } from "./TableQuestion";
+import TableQuestion, {
+  extractTableQuestionIds,
+  extractTableQuestionInfo,
+} from "./TableQuestion";
+import type { QuestionInfo } from "./TableQuestion";
 import styles from "./ReadingTest.module.css";
 
 interface ReadingTestProps {
@@ -19,22 +23,22 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
 
   // Get questions for current passage (including table questions)
   const currentPassage = passages[currentPart];
-  const currentQuestionIds = useMemo(() => {
+  const currentQuestionInfo = useMemo(() => {
     if (!currentPassage) return [];
-    const ids: number[] = [];
+    const questions: QuestionInfo[] = [];
     currentPassage.groups.forEach((group) => {
       // Check if this is a table completion group
       if (group.groupType === "TABLE_COMPLETION" && group.tableData) {
-        const tableQuestionIds = extractTableQuestionIds(group.tableData);
-        ids.push(...tableQuestionIds);
+        const tableQuestions = extractTableQuestionInfo(group.tableData);
+        questions.push(...tableQuestions);
       } else {
         // Normal questions
         group.questions.forEach((q) => {
-          ids.push(q.id);
+          questions.push({ id: q.id, displayNumber: q.id });
         });
       }
     });
-    return ids.sort((a, b) => a - b);
+    return questions.sort((a, b) => a.displayNumber - b.displayNumber);
   }, [currentPassage]);
 
   // Reset currentPart when component mounts or examData changes
@@ -75,8 +79,9 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
           <p className={styles.passageSubtitle}>
             You should spend about 20 minutes on{" "}
             <strong>
-              Questions {currentQuestionIds[0] || 1}-
-              {currentQuestionIds[currentQuestionIds.length - 1] || 1}
+              Questions {currentQuestionInfo[0]?.displayNumber || 1}-
+              {currentQuestionInfo[currentQuestionInfo.length - 1]
+                ?.displayNumber || 1}
             </strong>
             , which are based on Reading Passage {currentPart + 1} below.
           </p>
@@ -156,15 +161,15 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
         </div>
 
         <div className={styles.partButtons}>
-          {currentQuestionIds.map((id) => (
+          {currentQuestionInfo.map((qInfo) => (
             <button
-              key={id}
+              key={qInfo.id}
               className={`${styles.partButton} ${
-                answers[id] ? styles.completed : ""
+                answers[qInfo.id] ? styles.completed : ""
               }`}
-              onClick={() => scrollToQuestion(id)}
+              onClick={() => scrollToQuestion(qInfo.id)}
             >
-              {id}
+              {qInfo.displayNumber}
             </button>
           ))}
         </div>

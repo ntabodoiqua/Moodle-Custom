@@ -7,7 +7,11 @@ import {
 } from "@ant-design/icons";
 import { useExamStore } from "../store/examStore";
 import QuestionRenderer from "./QuestionRenderer";
-import TableQuestion, { extractTableQuestionIds } from "./TableQuestion";
+import TableQuestion, {
+  extractTableQuestionIds,
+  extractTableQuestionInfo,
+} from "./TableQuestion";
+import type { QuestionInfo } from "./TableQuestion";
 import styles from "./ListeningTest.module.css";
 
 interface ListeningTestProps {
@@ -30,23 +34,24 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
   // Get current section
   const currentSection = sections[currentSectionIndex];
 
-  // Get all question IDs for current section (including table questions)
-  const currentQuestionIds = useMemo(() => {
+  // Get all question info for current section (including table questions)
+  // This stores both the actual ID (for storing answers) and display number (for showing in UI)
+  const currentQuestionInfo = useMemo(() => {
     if (!currentSection) return [];
-    const ids: number[] = [];
+    const questions: QuestionInfo[] = [];
     currentSection.groups.forEach((group) => {
       // Check if this is a table completion group
       if (group.groupType === "TABLE_COMPLETION" && group.tableData) {
-        const tableQuestionIds = extractTableQuestionIds(group.tableData);
-        ids.push(...tableQuestionIds);
+        const tableQuestions = extractTableQuestionInfo(group.tableData);
+        questions.push(...tableQuestions);
       } else {
         // Normal questions
         group.questions.forEach((q) => {
-          ids.push(q.id);
+          questions.push({ id: q.id, displayNumber: q.id });
         });
       }
     });
-    return ids.sort((a, b) => a - b);
+    return questions.sort((a, b) => a.displayNumber - b.displayNumber);
   }, [currentSection]);
 
   // Reset state when component mounts or examData changes
@@ -278,15 +283,15 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
         </div>
 
         <div className={styles.questionButtons}>
-          {currentQuestionIds.map((id) => (
+          {currentQuestionInfo.map((qInfo) => (
             <button
-              key={id}
+              key={qInfo.id}
               className={`${styles.questionButton} ${
-                answers[id] ? styles.completed : ""
+                answers[qInfo.id] ? styles.completed : ""
               }`}
-              onClick={() => scrollToQuestion(id)}
+              onClick={() => scrollToQuestion(qInfo.id)}
             >
-              {id}
+              {qInfo.displayNumber}
             </button>
           ))}
         </div>

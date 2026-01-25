@@ -42,6 +42,12 @@ define([
     part: 1,
   };
 
+  // Question number counters for each skill (display numbers)
+  let questionNumberCounters = {
+    reading: 1,
+    listening: 1,
+  };
+
   // Question types
   const questionTypes = [
     { value: "MULTIPLE_CHOICE", label: "Multiple Choice (Single Answer)" },
@@ -361,6 +367,13 @@ define([
         // Update questions list based on cell content
         updateTableQuestions(group);
 
+        // Find which skill this group belongs to and recalculate numbers
+        const skill = findSkillForGroup(groupId);
+        if (skill) {
+          recalculateQuestionNumbers(skill);
+          showQuestionNumberingSummary();
+        }
+
         // Re-render the questions section
         const questionsSection = tableEditor.find(".table-questions-list");
         questionsSection.html(renderTableQuestionsEditor(group));
@@ -469,6 +482,9 @@ define([
 
           // Render existing content
           renderExistingContent();
+
+          // Show initial numbering summary
+          showQuestionNumberingSummary();
         }
       } catch (e) {
         console.warn("Could not parse existing exam data:", e);
@@ -519,6 +535,165 @@ define([
       data.speaking.forEach(function (part) {
         idCounters.part = Math.max(idCounters.part, part.id + 1);
       });
+    }
+
+    // Update question number counters
+    updateQuestionNumberCounters();
+  }
+
+  /**
+   * Get the next question number for a skill
+   */
+  function getNextQuestionNumber(skill) {
+    return questionNumberCounters[skill] || 1;
+  }
+
+  /**
+   * Count total questions for a skill
+   */
+  function countQuestionsForSkill(skill) {
+    let count = 0;
+    const data = examData[skill];
+    if (!data) return count;
+
+    data.forEach(function (parent) {
+      if (parent.groups) {
+        parent.groups.forEach(function (group) {
+          if (
+            group.groupType === "TABLE_COMPLETION" &&
+            group.tableData &&
+            group.tableData.questions
+          ) {
+            count += group.tableData.questions.length;
+          } else if (group.questions) {
+            count += group.questions.length;
+          }
+        });
+      }
+    });
+
+    return count;
+  }
+
+  /**
+   * Update question number counters based on current data
+   */
+  function updateQuestionNumberCounters() {
+    questionNumberCounters.reading = countQuestionsForSkill("reading") + 1;
+    questionNumberCounters.listening = countQuestionsForSkill("listening") + 1;
+  }
+
+  /**
+   * Recalculate and update all question numbers for a skill
+   * This ensures sequential numbering starting from 1
+   */
+  function recalculateQuestionNumbers(skill) {
+    const data = examData[skill];
+    if (!data) return;
+
+    let questionNum = 1;
+
+    data.forEach(function (parent) {
+      if (parent.groups) {
+        parent.groups.forEach(function (group) {
+          if (
+            group.groupType === "TABLE_COMPLETION" &&
+            group.tableData &&
+            group.tableData.questions
+          ) {
+            // Update table questions
+            group.tableData.questions.forEach(function (tq) {
+              tq.number = questionNum++;
+            });
+            // Update cell content with new numbers
+            updateTableCellNumbers(group);
+
+            // Re-render the table editor to reflect new numbers
+            const tableEditor = $(`.table-editor[data-group-id="${group.id}"]`);
+            if (tableEditor.length) {
+              tableEditor.replaceWith(renderTableEditor(group));
+            }
+          } else if (group.questions) {
+            // Update normal questions
+            group.questions.forEach(function (q) {
+              q.number = String(questionNum++);
+              // Update DOM if rendered (both hidden input and badge)
+              $(
+                `.question-item[data-question-id="${q.id}"] .question-number`,
+              ).val(q.number);
+              $(
+                `.question-item[data-question-id="${q.id}"] .question-number-badge`,
+              ).text("Q" + q.number);
+            });
+          }
+        });
+      }
+    });
+
+    // Update counter
+    questionNumberCounters[skill] = questionNum;
+  }
+
+  /**
+   * Update table cell content with new question numbers
+   */
+  function updateTableCellNumbers(group) {
+    if (!group.tableData || !group.tableData.questions) return;
+
+    // Build mapping from old number to new number
+    const questionsMap = {};
+    group.tableData.questions.forEach(function (q) {
+      questionsMap[q.id] = q.number;
+    });
+
+    // Update rows with new numbers
+    if (group.tableData.rows) {
+      group.tableData.rows = group.tableData.rows.map(function (row) {
+        return row.map(function (cell) {
+          const match = cell.match(/^\[(\d+)\]$/);
+          if (match) {
+            // Find the question with this display number
+            const q = group.tableData.questions.find(function (q) {
+              return (
+                q.number === parseInt(match[1]) || q.id === parseInt(match[1])
+              );
+            });
+            if (q) {
+              return "[" + q.number + "]";
+            }
+          }
+          return cell;
+        });
+      });
+    }
+  }
+
+  /**
+   * Show question numbering summary
+   */
+  function showQuestionNumberingSummary() {
+    const readingCount = countQuestionsForSkill("reading");
+    const listeningCount = countQuestionsForSkill("listening");
+
+    let summaryHtml = '<div class="alert alert-info mb-3">';
+    summaryHtml +=
+      '<strong><i class="fa fa-info-circle"></i> Question Numbering Summary</strong><br>';
+
+    if (readingCount > 0) {
+      summaryHtml += `<small>Reading: Questions 1-${readingCount}</small><br>`;
+    }
+    if (listeningCount > 0) {
+      summaryHtml += `<small>Listening: Questions 1-${listeningCount}</small><br>`;
+    }
+    if (readingCount === 0 && listeningCount === 0) {
+      summaryHtml += "<small>No questions added yet</small>";
+    }
+
+    summaryHtml += "</div>";
+
+    // Update or create summary element
+    if ($("#question-numbering-summary").length) {
+      $("#question-numbering-summary").html(summaryHtml);
     }
   }
 
@@ -745,9 +920,10 @@ define([
    */
   function addQuestion(groupId, skill) {
     const questionId = idCounters.question++;
+    const nextNum = getNextQuestionNumber(skill);
     const question = {
       id: questionId,
-      number: String(questionId),
+      number: String(nextNum),
       text: "",
       type: "MULTIPLE_CHOICE",
       options: ["", "", "", ""],
@@ -785,7 +961,10 @@ define([
 
     if (found) {
       renderQuestion(groupId, question);
+      // Recalculate all numbers to ensure consistency
+      recalculateQuestionNumbers(skill);
       updateBuilderJson();
+      showQuestionNumberingSummary();
     }
   }
 
@@ -810,10 +989,10 @@ define([
             }">
                 <div class="row align-items-center mb-2">
                     <div class="col-auto">
-                        <input type="text" class="form-control form-control-sm question-number" 
-                            value="${escapeHtml(
-                              question.number,
-                            )}" placeholder="#" style="width: 60px;">
+                        <span class="badge badge-primary question-number-badge" style="font-size: 14px; padding: 8px 12px;">
+                            Q${escapeHtml(question.number)}
+                        </span>
+                        <input type="hidden" class="question-number" value="${escapeHtml(question.number)}">
                     </div>
                     <div class="col">
                         <select class="form-control form-control-sm question-type">
@@ -1707,11 +1886,15 @@ define([
         destroyEditor("passage_content_" + id);
         examData.reading = examData.reading.filter((p) => p.id !== id);
         $(`.passage-item[data-passage-id="${id}"]`).remove();
+        recalculateQuestionNumbers("reading");
+        showQuestionNumberingSummary();
         break;
 
       case "section":
         examData.listening = examData.listening.filter((s) => s.id !== id);
         $(`.section-item[data-section-id="${id}"]`).remove();
+        recalculateQuestionNumbers("listening");
+        showQuestionNumberingSummary();
         break;
 
       case "task":
@@ -1742,36 +1925,60 @@ define([
    * Delete a group from all skills
    */
   function deleteGroup(groupId) {
+    let deletedFromSkill = null;
+
     ["reading", "listening"].forEach(function (skill) {
       if (examData[skill]) {
         examData[skill].forEach(function (parent) {
           if (parent.groups) {
+            const originalLength = parent.groups.length;
             parent.groups = parent.groups.filter((g) => g.id !== groupId);
+            if (parent.groups.length < originalLength) {
+              deletedFromSkill = skill;
+            }
           }
         });
       }
     });
+
+    // Recalculate numbers after deletion
+    if (deletedFromSkill) {
+      recalculateQuestionNumbers(deletedFromSkill);
+      showQuestionNumberingSummary();
+    }
   }
 
   /**
    * Delete a question from all groups
    */
   function deleteQuestion(questionId) {
+    let deletedFromSkill = null;
+
     ["reading", "listening"].forEach(function (skill) {
       if (examData[skill]) {
         examData[skill].forEach(function (parent) {
           if (parent.groups) {
             parent.groups.forEach(function (group) {
               if (group.questions) {
+                const originalLength = group.questions.length;
                 group.questions = group.questions.filter(
                   (q) => q.id !== questionId,
                 );
+                if (group.questions.length < originalLength) {
+                  deletedFromSkill = skill;
+                }
               }
             });
           }
         });
       }
     });
+
+    // Recalculate numbers after deletion
+    if (deletedFromSkill) {
+      recalculateQuestionNumbers(deletedFromSkill);
+      showQuestionNumberingSummary();
+    }
   }
 
   // ==========================================================
@@ -1820,6 +2027,26 @@ define([
     });
 
     return found;
+  }
+
+  /**
+   * Find which skill a group belongs to
+   */
+  function findSkillForGroup(groupId) {
+    let foundSkill = null;
+
+    ["reading", "listening"].forEach(function (skill) {
+      if (examData[skill] && !foundSkill) {
+        examData[skill].forEach(function (parent) {
+          if (parent.groups && !foundSkill) {
+            const g = parent.groups.find((g) => g.id === groupId);
+            if (g) foundSkill = skill;
+          }
+        });
+      }
+    });
+
+    return foundSkill;
   }
 
   /**

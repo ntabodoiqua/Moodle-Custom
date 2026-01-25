@@ -143,6 +143,11 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->addElement('html', '</div></div>'); // End duration settings.
 
         // -------------------------------------------------------
+        // QUESTION NUMBERING SUMMARY
+        // -------------------------------------------------------
+        $mform->addElement('html', '<div id="question-numbering-summary"></div>');
+
+        // -------------------------------------------------------
         // READING SECTION
         // -------------------------------------------------------
         $mform->addElement('html', '<div id="reading-section" class="ielts-skill-section card p-3 mb-3" style="display:none;">');

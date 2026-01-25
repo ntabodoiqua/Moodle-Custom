@@ -130,4 +130,37 @@ export const extractTableQuestionIds = (tableData: TableData): number[] => {
   return questionIds.sort((a, b) => a - b);
 };
 
+// Helper to extract question info with both ID and display number
+export interface QuestionInfo {
+  id: number;
+  displayNumber: number;
+}
+
+export const extractTableQuestionInfo = (
+  tableData: TableData,
+): QuestionInfo[] => {
+  // If questions array exists with proper structure
+  if (tableData.questions && tableData.questions.length > 0) {
+    return tableData.questions
+      .map((q) => ({
+        id: q.id,
+        displayNumber: q.number !== undefined ? q.number : q.id,
+      }))
+      .sort((a, b) => a.displayNumber - b.displayNumber);
+  }
+
+  // Fallback: extract from cell content (for backward compatibility)
+  const questions: QuestionInfo[] = [];
+  tableData.rows.forEach((row) => {
+    row.forEach((cell) => {
+      const questionNumber = extractQuestionNumber(cell.trim());
+      if (questionNumber !== null) {
+        questions.push({ id: questionNumber, displayNumber: questionNumber });
+      }
+    });
+  });
+
+  return questions.sort((a, b) => a.displayNumber - b.displayNumber);
+};
+
 export default TableQuestion;

@@ -142,6 +142,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
   const getReadingQuestions = () => {
     const questions: {
       id: number;
+      displayNumber: number;
       partIndex: number;
       groupTitle: string;
       text: string;
@@ -155,11 +156,13 @@ const ResultPage = ({ config }: ResultPageProps) => {
         // Handle TABLE_COMPLETION groups
         if (group.groupType === "TABLE_COMPLETION" && group.tableData) {
           group.tableData.questions?.forEach((tq) => {
+            const displayNum = tq.number !== undefined ? tq.number : tq.id;
             questions.push({
               id: tq.id,
+              displayNumber: displayNum,
               partIndex,
               groupTitle: group.title,
-              text: `Table Question ${tq.id}`,
+              text: `Table Question ${displayNum}`,
               type: "TABLE_COMPLETION",
               correctAnswer: tq.correctAnswer,
               isTableQuestion: true,
@@ -170,6 +173,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
           group.questions.forEach((q) => {
             questions.push({
               id: q.id,
+              displayNumber: q.id,
               partIndex,
               groupTitle: group.title,
               text: q.text,
@@ -187,6 +191,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
   const getListeningQuestions = () => {
     const questions: {
       id: number;
+      displayNumber: number;
       partIndex: number;
       groupTitle: string;
       text: string;
@@ -201,11 +206,13 @@ const ResultPage = ({ config }: ResultPageProps) => {
         if (group.groupType === "TABLE_COMPLETION" && group.tableData) {
           // Extract questions from tableData.questions if available
           group.tableData.questions?.forEach((tq) => {
+            const displayNum = tq.number !== undefined ? tq.number : tq.id;
             questions.push({
               id: tq.id,
+              displayNumber: displayNum,
               partIndex,
               groupTitle: group.title,
-              text: `Table Question ${tq.id}`,
+              text: `Table Question ${displayNum}`,
               type: "TABLE_COMPLETION",
               correctAnswer: tq.correctAnswer,
               isTableQuestion: true,
@@ -216,6 +223,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
           group.questions.forEach((q) => {
             questions.push({
               id: q.id,
+              displayNumber: q.id,
               partIndex,
               groupTitle: group.title,
               text: q.text,
@@ -533,14 +541,22 @@ const ResultPage = ({ config }: ResultPageProps) => {
             const groupQuestions =
               group.groupType === "TABLE_COMPLETION" &&
               group.tableData?.questions
-                ? group.tableData.questions.map((tq) => ({
-                    id: tq.id,
-                    text: `Table Question ${tq.id}`,
-                    type: "TABLE_COMPLETION" as const,
-                    correctAnswer: tq.correctAnswer,
-                    options: undefined,
-                  }))
-                : group.questions;
+                ? group.tableData.questions.map((tq) => {
+                    const displayNum =
+                      tq.number !== undefined ? tq.number : tq.id;
+                    return {
+                      id: tq.id,
+                      displayNumber: displayNum,
+                      text: `Table Question ${displayNum}`,
+                      type: "TABLE_COMPLETION" as const,
+                      correctAnswer: tq.correctAnswer,
+                      options: undefined,
+                    };
+                  })
+                : group.questions.map((q) => ({
+                    ...q,
+                    displayNumber: q.id,
+                  }));
 
             return (
               <div key={group.id} className={styles.questionGroup}>
@@ -565,7 +581,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
                             isCorrect ? styles.correct : styles.incorrect
                           }`}
                         >
-                          {q.id}
+                          {q.displayNumber}
                         </span>
                         {q.type === "MULTIPLE_CHOICE" && q.options && (
                           <select
@@ -727,14 +743,22 @@ const ResultPage = ({ config }: ResultPageProps) => {
             const groupQuestions =
               group.groupType === "TABLE_COMPLETION" &&
               group.tableData?.questions
-                ? group.tableData.questions.map((tq) => ({
-                    id: tq.id,
-                    text: `Table Question ${tq.id}`,
-                    type: "TABLE_COMPLETION" as const,
-                    correctAnswer: tq.correctAnswer,
-                    options: undefined,
-                  }))
-                : group.questions;
+                ? group.tableData.questions.map((tq) => {
+                    const displayNum =
+                      tq.number !== undefined ? tq.number : tq.id;
+                    return {
+                      id: tq.id,
+                      displayNumber: displayNum,
+                      text: `Table Question ${displayNum}`,
+                      type: "TABLE_COMPLETION" as const,
+                      correctAnswer: tq.correctAnswer,
+                      options: undefined,
+                    };
+                  })
+                : group.questions.map((q) => ({
+                    ...q,
+                    displayNumber: q.id,
+                  }));
 
             return (
               <div key={group.id} className={styles.questionGroup}>
@@ -759,7 +783,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
                             isCorrect ? styles.correct : styles.incorrect
                           }`}
                         >
-                          {q.id}
+                          {q.displayNumber}
                         </span>
                         <span
                           className={styles.questionText}
