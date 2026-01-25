@@ -375,6 +375,27 @@ define([
           const cellValue = input.val();
           const hasQuestionPattern = /\[\d+\]/.test(cellValue);
 
+          // Always update validation messages
+          const validation = validateTableQuestionNumbers(group.tableData);
+          const validationContainer = tableEditor.find(
+            ".table-validation-messages",
+          );
+          validationContainer.html(renderTableValidationMessages(validation));
+
+          // Update cell highlighting
+          tableEditor.find(".table-cell-input").each(function () {
+            const cellInput = $(this);
+            const cellVal = cellInput.val();
+            cellInput.removeClass("is-invalid border-danger border-primary");
+            const highlightClass = highlightCellWithQuestionNumber(
+              cellVal,
+              validation,
+            );
+            if (highlightClass) {
+              cellInput.addClass(highlightClass);
+            }
+          });
+
           // Only update questions if there's a question pattern
           if (hasQuestionPattern || cellValue === "") {
             updateTableQuestions(group);
@@ -1259,12 +1280,16 @@ define([
     const numCols = tableData.headers.length;
     const numRows = tableData.rows.length;
 
+    // Validate question numbers
+    const validation = validateTableQuestionNumbers(tableData);
+
     let html = `
       <div class="table-editor" data-group-id="${group.id}">
         <div class="alert alert-info py-2 px-3 mb-2" style="font-size: 12px;">
           <i class="fa fa-info-circle"></i> <strong>Table Completion:</strong> 
           Use <code>[number]</code> syntax (e.g., <code>[1]</code>, <code>[2]</code>) in cells to create input fields.
           Each <code>[number]</code> becomes an independent question.
+          <br><small class="text-muted">Numbers must be sequential (e.g., [1], [2], [3]). No duplicates or gaps allowed.</small>
         </div>
         
         <div class="row mb-2">
@@ -1283,6 +1308,10 @@ define([
               <i class="fa fa-refresh"></i> Update Size
             </button>
           </div>
+        </div>
+
+        <div class="table-validation-messages">
+          ${renderTableValidationMessages(validation)}
         </div>
 
         <div class="table-responsive mb-3">
@@ -1306,7 +1335,7 @@ define([
                       ${row
                         .map(
                           (cell, colIdx) =>
-                            `<td><input type="text" class="form-control form-control-sm table-cell-input" 
+                            `<td><input type="text" class="form-control form-control-sm table-cell-input ${highlightCellWithQuestionNumber(cell, validation)}" 
                               data-row="${rowIdx}" data-col="${colIdx}" value="${escapeHtml(cell)}" 
                               placeholder="Cell or [number]"></td>`,
                         )
@@ -1330,6 +1359,28 @@ define([
       </div>`;
 
     return html;
+  }
+
+  /**
+   * Highlight cells that contain question numbers with validation status
+   */
+  function highlightCellWithQuestionNumber(cellContent, validation) {
+    const match = cellContent.match(/\[(\d+)\]/);
+    if (!match) return "";
+
+    const num = parseInt(match[1], 10);
+
+    // Check if this number has errors
+    if (!validation.isValid) {
+      // Check for duplicates or missing numbers
+      const hasError = validation.errors.some((e) => e.includes(`[${num}]`));
+      if (hasError) {
+        return "is-invalid border-danger";
+      }
+    }
+
+    // Valid question marker
+    return "border-primary";
   }
 
   /**
@@ -1374,6 +1425,139 @@ define([
     });
 
     return Array.from(questionNumbers).sort((a, b) => a - b);
+  }
+
+  /**
+   * Validate table question numbers - check for sequential numbering
+   * Returns object with isValid, errors array, and suggestions
+   */
+  function validateTableQuestionNumbers(tableData) {
+    const questionNumbers = parseTableQuestionNumbers(tableData);
+    const errors = [];
+    const warnings = [];
+
+    if (questionNumbers.length === 0) {
+      return {
+        isValid: true,
+        errors: [],
+        warnings: [
+          "No question markers found. Use [1], [2], etc. to create questions.",
+        ],
+        questionNumbers: [],
+      };
+    }
+
+    // Check if starts with 1 or continues from previous questions
+    const minNum = Math.min(...questionNumbers);
+    const maxNum = Math.max(...questionNumbers);
+
+    // Check for duplicates (already handled by Set, but let's check in cells)
+    const cellQuestionMap = {};
+    const regex = /\[(\d+)\]/g;
+    tableData.rows.forEach((row, rowIdx) => {
+      row.forEach((cell, colIdx) => {
+        let match;
+        while ((match = regex.exec(cell)) !== null) {
+          const num = parseInt(match[1], 10);
+          if (!cellQuestionMap[num]) {
+            cellQuestionMap[num] = [];
+          }
+          cellQuestionMap[num].push({ row: rowIdx + 1, col: colIdx + 1 });
+        }
+      });
+    });
+
+    // Check for duplicate question numbers
+    Object.entries(cellQuestionMap).forEach(([num, locations]) => {
+      if (locations.length > 1) {
+        const locs = locations
+          .map((l) => `Row ${l.row}, Col ${l.col}`)
+          .join("; ");
+        errors.push(`Question [${num}] appears multiple times: ${locs}`);
+      }
+    });
+
+    // Check for gaps in sequence
+    const expectedSequence = [];
+    for (let i = minNum; i <= maxNum; i++) {
+      expectedSequence.push(i);
+    }
+
+    const missingNumbers = expectedSequence.filter(
+      (n) => !questionNumbers.includes(n),
+    );
+    if (missingNumbers.length > 0) {
+      errors.push(`Missing question numbers: [${missingNumbers.join("], [")}]`);
+    }
+
+    // Warning if not starting from 1 (might be intentional for multi-section)
+    if (minNum !== 1) {
+      warnings.push(
+        `Questions start from [${minNum}] instead of [1]. This is OK if continuing from previous section.`,
+      );
+    }
+
+    // Suggestion for correct format
+    let suggestion = "";
+    if (errors.length > 0) {
+      const correctedSequence = [];
+      for (let i = 1; i <= questionNumbers.length; i++) {
+        correctedSequence.push(`[${i}]`);
+      }
+      suggestion = `Suggested sequence: ${correctedSequence.join(", ")}`;
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      questionNumbers,
+      suggestion,
+    };
+  }
+
+  /**
+   * Render validation messages for table editor
+   */
+  function renderTableValidationMessages(validation) {
+    if (validation.errors.length === 0 && validation.warnings.length === 0) {
+      if (validation.questionNumbers.length > 0) {
+        return `
+          <div class="alert alert-success py-1 px-2 mb-2" style="font-size: 11px;">
+            <i class="fa fa-check-circle"></i> 
+            <strong>Valid:</strong> ${validation.questionNumbers.length} question(s) found: 
+            [${validation.questionNumbers.join("], [")}]
+          </div>`;
+      }
+      return "";
+    }
+
+    let html = "";
+
+    // Show errors
+    if (validation.errors.length > 0) {
+      html += `
+        <div class="alert alert-danger py-1 px-2 mb-2" style="font-size: 11px;">
+          <i class="fa fa-exclamation-triangle"></i> <strong>Errors:</strong>
+          <ul class="mb-0 pl-3">
+            ${validation.errors.map((e) => `<li>${escapeHtml(e)}</li>`).join("")}
+          </ul>
+          ${validation.suggestion ? `<div class="mt-1"><i class="fa fa-lightbulb-o"></i> ${escapeHtml(validation.suggestion)}</div>` : ""}
+        </div>`;
+    }
+
+    // Show warnings
+    if (validation.warnings.length > 0) {
+      html += `
+        <div class="alert alert-warning py-1 px-2 mb-2" style="font-size: 11px;">
+          <i class="fa fa-info-circle"></i> <strong>Notes:</strong>
+          <ul class="mb-0 pl-3">
+            ${validation.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}
+          </ul>
+        </div>`;
+    }
+
+    return html;
   }
 
   /**
