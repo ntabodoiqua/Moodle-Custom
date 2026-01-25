@@ -58,15 +58,6 @@ if ($attempt->userid != $USER->id && !has_capability('mod/ielts:grade', $context
     throw new moodle_exception('nopermission', 'mod_ielts');
 }
 
-// Set up the page.
-$PAGE->set_url('/mod/ielts/review.php', ['id' => $cm->id, 'attemptid' => $attemptid]);
-$PAGE->set_title($course->shortname . ': ' . $ielts->name . ' - ' . get_string('review', 'mod_ielts'));
-$PAGE->set_heading($course->fullname);
-$PAGE->set_context($context);
-
-// Use embedded layout for React app.
-$PAGE->set_pagelayout('embedded');
-
 // Prepare Moodle configuration for React app with review mode.
 $moodleconfig = [
     'userId' => $USER->id,
@@ -89,23 +80,9 @@ $moodleconfig = [
     'backUrl' => (new moodle_url('/mod/ielts/view.php', ['id' => $cm->id]))->out(false),
 ];
 
-// Output page header.
-echo $OUTPUT->header();
-
-// Inject global MoodleConfig for React app.
 $configjson = json_encode($moodleconfig, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
-echo html_writer::script("window.MoodleConfig = {$configjson};");
-
-// Render React root div with data attribute backup.
-echo html_writer::tag('div', '', [
-    'id' => 'root',
-    'data-moodle-config' => $configjson,
-]);
 
 // Find the correct asset files with hash in filename.
-$builddir = $CFG->dirroot . '/mod/ielts/build/assets/';
-
-// Read from index.html to get the exact file names.
 $mainjs = '';
 $maincss = '';
 $indexhtml = file_get_contents($CFG->dirroot . '/mod/ielts/build/index.html');
@@ -116,21 +93,30 @@ if (preg_match('/href="[^"]*\/assets\/(index-[^"]+\.css)"/', $indexhtml, $matche
     $maincss = $matches[1];
 }
 
-// Include React build CSS.
-if ($maincss) {
-    echo html_writer::tag('link', '', [
-        'rel' => 'stylesheet',
-        'href' => new moodle_url('/mod/ielts/build/assets/' . $maincss),
-    ]);
-}
+$cssurl = $maincss ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $maincss : '';
+$jsurl = $mainjs ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $mainjs : '';
 
-// Include main React bundle.
-if ($mainjs) {
-    echo html_writer::tag('script', '', [
-        'type' => 'module',
-        'src' => new moodle_url('/mod/ielts/build/assets/' . $mainjs),
-    ]);
-}
-
-// Output page footer.
-echo $OUTPUT->footer();
+// Output raw HTML without Moodle's header/footer to avoid reactive component errors.
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo format_string($ielts->name); ?> - <?php echo get_string('review', 'mod_ielts'); ?></title>
+    <?php if ($cssurl): ?>
+    <link rel="stylesheet" href="<?php echo $cssurl; ?>">
+    <?php endif; ?>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #root { height: 100%; width: 100%; }
+    </style>
+</head>
+<body>
+    <script>window.MoodleConfig = <?php echo $configjson; ?>;</script>
+    <div id="root" data-moodle-config="<?php echo htmlspecialchars($configjson, ENT_QUOTES); ?>"></div>
+    <?php if ($jsurl): ?>
+    <script type="module" src="<?php echo $jsurl; ?>"></script>
+    <?php endif; ?>
+</body>
+</html>

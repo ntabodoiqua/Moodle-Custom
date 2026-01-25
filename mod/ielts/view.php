@@ -72,16 +72,7 @@ render_overview_page($ielts, $cm, $course, $context, $examConfigured);
  * Render the exam page with React app.
  */
 function render_exam_page($ielts, $cm, $course, $context) {
-    global $PAGE, $OUTPUT, $USER, $CFG;
-
-    // Set up the page.
-    $PAGE->set_url('/mod/ielts/view.php', ['id' => $cm->id, 'action' => 'attempt']);
-    $PAGE->set_title($course->shortname . ': ' . $ielts->name);
-    $PAGE->set_heading($course->fullname);
-    $PAGE->set_context($context);
-
-    // Use embedded layout to hide Moodle chrome for React app.
-    $PAGE->set_pagelayout('embedded');
+    global $USER, $CFG;
 
     // Prepare Moodle configuration for React app.
     $moodleconfig = [
@@ -96,34 +87,12 @@ function render_exam_page($ielts, $cm, $course, $context) {
         'canSubmit' => has_capability('mod/ielts:submit', $context),
     ];
 
-    // Output page header.
-    echo $OUTPUT->header();
-
-    // Inject global MoodleConfig for React app.
     $configjson = json_encode($moodleconfig, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
-    echo html_writer::script("window.MoodleConfig = {$configjson};");
-
-    // Render React root div with data attribute backup.
-    echo html_writer::tag('div', '', [
-        'id' => 'root',
-        'data-moodle-config' => $configjson,
-    ]);
 
     // Find the correct asset files with hash in filename.
-    $builddir = $CFG->dirroot . '/mod/ielts/build/assets/';
-    $cssfiles = glob($builddir . 'index-*.css');
-    $jsfiles = glob($builddir . 'index-*.js');
-    
-    // Sort to get the main entry file (usually the largest one or by name).
-    // The entry JS file is typically named index-XXXXX.js
     $mainjs = '';
     $maincss = '';
     
-    if (!empty($cssfiles)) {
-        $maincss = basename($cssfiles[0]);
-    }
-    
-    // Find the main entry JS (the one that's loaded directly, not a chunk).
     // Read from index.html to get the exact file.
     $indexhtml = file_get_contents($CFG->dirroot . '/mod/ielts/build/index.html');
     if (preg_match('/src="[^"]*\/assets\/(index-[^"]+\.js)"/', $indexhtml, $matches)) {
@@ -133,24 +102,34 @@ function render_exam_page($ielts, $cm, $course, $context) {
         $maincss = $matches[1];
     }
 
-    // Include React build CSS.
-    if ($maincss) {
-        echo html_writer::tag('link', '', [
-            'rel' => 'stylesheet',
-            'href' => new moodle_url('/mod/ielts/build/assets/' . $maincss),
-        ]);
-    }
+    $cssurl = $maincss ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $maincss : '';
+    $jsurl = $mainjs ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $mainjs : '';
 
-    // Include main React bundle.
-    if ($mainjs) {
-        echo html_writer::tag('script', '', [
-            'type' => 'module',
-            'src' => new moodle_url('/mod/ielts/build/assets/' . $mainjs),
-        ]);
-    }
-
-    // Output page footer.
-    echo $OUTPUT->footer();
+    // Output raw HTML without Moodle's header/footer to avoid reactive component errors.
+    ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo format_string($ielts->name); ?></title>
+    <?php if ($cssurl): ?>
+    <link rel="stylesheet" href="<?php echo $cssurl; ?>">
+    <?php endif; ?>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #root { height: 100%; width: 100%; }
+    </style>
+</head>
+<body>
+    <script>window.MoodleConfig = <?php echo $configjson; ?>;</script>
+    <div id="root" data-moodle-config="<?php echo htmlspecialchars($configjson, ENT_QUOTES); ?>"></div>
+    <?php if ($jsurl): ?>
+    <script type="module" src="<?php echo $jsurl; ?>"></script>
+    <?php endif; ?>
+</body>
+</html>
+    <?php
 }
 
 /**
