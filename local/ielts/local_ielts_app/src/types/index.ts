@@ -56,14 +56,15 @@ export type GroupType = "NORMAL" | "TABLE_COMPLETION";
 
 // Table question with correct answer (for scoring)
 export interface TableQuestion {
-  id: number; // Question ID that appears as [id] in cells
+  id: number; // Unique question ID for storing answers
+  number?: number; // Display number that appears as [number] in cells (optional for backward compatibility)
   correctAnswer: string; // The correct answer for this question
 }
 
 // Table data structure for TABLE_COMPLETION groups
 export interface TableData {
   headers: string[];
-  rows: string[][]; // Each cell can contain text or "[questionId]" pattern
+  rows: string[][]; // Each cell can contain text or "[number]" pattern
   questions?: TableQuestion[]; // Questions with correct answers for scoring
 }
 

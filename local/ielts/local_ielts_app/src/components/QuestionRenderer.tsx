@@ -28,19 +28,20 @@ const QuestionRenderer = ({
 
   // Render based on question type
   switch (type) {
-    // Single choice dropdown
+    // Single choice - Radio buttons
     case "MULTIPLE_CHOICE":
       return (
-        <Select
-          className={styles.answerSelect}
-          placeholder="Select answer"
+        <Radio.Group
+          className={styles.radioGroup}
           value={answer || undefined}
-          onChange={(value) => onAnswerChange(id, value)}
-          options={options?.map((opt) => ({
-            label: opt,
-            value: opt,
-          }))}
-        />
+          onChange={(e) => onAnswerChange(id, e.target.value)}
+        >
+          {options?.map((opt, idx) => (
+            <Radio key={idx} value={opt} className={styles.radioItem}>
+              {opt}
+            </Radio>
+          ))}
+        </Radio.Group>
       );
 
     // Multiple choice with multiple correct answers

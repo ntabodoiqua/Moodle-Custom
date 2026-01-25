@@ -9,8 +9,8 @@ interface TableQuestionProps {
   questionIdPrefix?: string; // Prefix for generating question IDs (e.g., "listening-question-")
 }
 
-// Extract question ID from cell content like "[1]", "[2]", etc.
-const extractQuestionId = (cellContent: string): number | null => {
+// Extract question number from cell content like "[1]", "[2]", etc.
+const extractQuestionNumber = (cellContent: string): number | null => {
   const match = cellContent.match(/^\[(\d+)\]$/);
   return match ? parseInt(match[1], 10) : null;
 };
@@ -18,12 +18,25 @@ const extractQuestionId = (cellContent: string): number | null => {
 // Parse a cell to check if it's a question input or plain text
 const parseCell = (
   cellContent: string,
-): { isQuestion: boolean; questionId: number | null; text: string } => {
-  const questionId = extractQuestionId(cellContent.trim());
-  if (questionId !== null) {
-    return { isQuestion: true, questionId, text: "" };
+): { isQuestion: boolean; questionNumber: number | null; text: string } => {
+  const questionNumber = extractQuestionNumber(cellContent.trim());
+  if (questionNumber !== null) {
+    return { isQuestion: true, questionNumber, text: "" };
   }
-  return { isQuestion: false, questionId: null, text: cellContent };
+  return { isQuestion: false, questionNumber: null, text: cellContent };
+};
+
+// Build a map from display number to actual question ID
+const buildQuestionIdMap = (tableData: TableData): Map<number, number> => {
+  const map = new Map<number, number>();
+  if (tableData.questions) {
+    tableData.questions.forEach((q) => {
+      // Support both new format (with number) and old format (id as number)
+      const displayNum = q.number !== undefined ? q.number : q.id;
+      map.set(displayNum, q.id);
+    });
+  }
+  return map;
 };
 
 const TableQuestion = ({
@@ -33,6 +46,7 @@ const TableQuestion = ({
   questionIdPrefix = "listening-question-",
 }: TableQuestionProps) => {
   const { headers, rows } = tableData;
+  const questionIdMap = buildQuestionIdMap(tableData);
 
   return (
     <div className={styles.tableContainer}>
@@ -52,8 +66,12 @@ const TableQuestion = ({
               {row.map((cell, cellIndex) => {
                 const parsed = parseCell(cell);
 
-                if (parsed.isQuestion && parsed.questionId !== null) {
-                  const questionId = parsed.questionId;
+                if (parsed.isQuestion && parsed.questionNumber !== null) {
+                  const displayNumber = parsed.questionNumber;
+                  // Get actual question ID from map, fallback to display number for backward compatibility
+                  const questionId =
+                    questionIdMap.get(displayNumber) ?? displayNumber;
+
                   return (
                     <td
                       key={cellIndex}
@@ -62,7 +80,7 @@ const TableQuestion = ({
                     >
                       <div className={styles.inputCell}>
                         <span className={styles.questionNumber}>
-                          {questionId}.
+                          {displayNumber}.
                         </span>
                         <Input
                           className={styles.tableInput}
@@ -93,13 +111,18 @@ const TableQuestion = ({
 
 // Helper function to extract all question IDs from table data
 export const extractTableQuestionIds = (tableData: TableData): number[] => {
-  const questionIds: number[] = [];
+  // If questions array exists, use the actual IDs
+  if (tableData.questions && tableData.questions.length > 0) {
+    return tableData.questions.map((q) => q.id).sort((a, b) => a - b);
+  }
 
+  // Fallback: extract from cell content (for backward compatibility)
+  const questionIds: number[] = [];
   tableData.rows.forEach((row) => {
     row.forEach((cell) => {
-      const questionId = extractQuestionId(cell.trim());
-      if (questionId !== null) {
-        questionIds.push(questionId);
+      const questionNumber = extractQuestionNumber(cell.trim());
+      if (questionNumber !== null) {
+        questionIds.push(questionNumber);
       }
     });
   });

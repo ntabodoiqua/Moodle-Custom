@@ -185,6 +185,15 @@ define([
       addOption(questionId);
     });
 
+    // Remove option for multiple choice
+    $(document).on("click", ".remove-option", function (e) {
+      e.preventDefault();
+      const questionItem = $(this).closest(".question-item");
+      const questionId = questionItem.data("question-id");
+      const index = $(this).data("index");
+      removeOption(questionId, index);
+    });
+
     // Add match item for matching questions
     $(document).on("click", ".add-match-item", function (e) {
       e.preventDefault();
@@ -257,10 +266,11 @@ define([
         if (newType === "TABLE_COMPLETION") {
           // Initialize tableData if needed
           if (!group.tableData) {
+            const newQuestionId = idCounters.question++;
             group.tableData = {
               headers: ["Column 1", "Column 2"],
               rows: [["", "[1]"]],
-              questions: [{ id: 1, correctAnswer: "" }],
+              questions: [{ id: newQuestionId, number: 1, correctAnswer: "" }],
             };
           }
           contentContainer.html(renderTableEditor(group));
@@ -982,6 +992,11 @@ define([
           </div>
           <input type="text" class="form-control option-input" data-index="${idx}" 
             value="${escapeHtml(opt)}" placeholder="Option ${letters[idx] || idx + 1}">
+          <div class="input-group-append">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-option" data-index="${idx}">
+              <i class="fa fa-times"></i>
+            </button>
+          </div>
         </div>`;
     });
 
@@ -1039,10 +1054,11 @@ define([
   function renderTableEditor(group) {
     // Initialize tableData if not exists
     if (!group.tableData) {
+      const newQuestionId = idCounters.question++;
       group.tableData = {
         headers: ["Column 1", "Column 2"],
         rows: [["", "[1]"]],
-        questions: [{ id: 1, correctAnswer: "" }],
+        questions: [{ id: newQuestionId, number: 1, correctAnswer: "" }],
       };
     }
 
@@ -1133,14 +1149,15 @@ define([
 
     let html = "";
     group.tableData.questions.forEach((q) => {
+      const displayNum = q.number || q.id;
       html += `
-        <div class="input-group input-group-sm mb-1 table-question-item" data-question-id="${q.id}">
+        <div class="input-group input-group-sm mb-1 table-question-item" data-question-id="${q.id}" data-question-number="${displayNum}">
           <div class="input-group-prepend">
-            <span class="input-group-text">[${q.id}]</span>
+            <span class="input-group-text">[${displayNum}]</span>
           </div>
           <input type="text" class="form-control table-question-answer" 
             data-question-id="${q.id}" value="${escapeHtml(q.correctAnswer || "")}" 
-            placeholder="Correct answer for question ${q.id}">
+            placeholder="Correct answer for question ${displayNum}">
         </div>`;
     });
 
@@ -1148,45 +1165,62 @@ define([
   }
 
   /**
-   * Parse table cells to extract question IDs
+   * Parse table cells to extract question numbers (from [n] syntax)
    */
-  function parseTableQuestionIds(tableData) {
-    const questionIds = new Set();
+  function parseTableQuestionNumbers(tableData) {
+    const questionNumbers = new Set();
     const regex = /\[(\d+)\]/g;
 
     tableData.rows.forEach((row) => {
       row.forEach((cell) => {
         let match;
         while ((match = regex.exec(cell)) !== null) {
-          questionIds.add(parseInt(match[1], 10));
+          questionNumbers.add(parseInt(match[1], 10));
         }
       });
     });
 
-    return Array.from(questionIds).sort((a, b) => a - b);
+    return Array.from(questionNumbers).sort((a, b) => a - b);
   }
 
   /**
    * Update table questions based on cell content
+   * Each question gets a unique ID from idCounters while preserving the display number
    */
   function updateTableQuestions(group) {
     if (!group.tableData) return;
 
-    const questionIds = parseTableQuestionIds(group.tableData);
-    const existingAnswers = {};
+    const questionNumbers = parseTableQuestionNumbers(group.tableData);
+    const existingByNumber = {};
 
-    // Preserve existing answers
+    // Preserve existing answers by number
     if (group.tableData.questions) {
       group.tableData.questions.forEach((q) => {
-        existingAnswers[q.id] = q.correctAnswer || "";
+        existingByNumber[q.number] = {
+          id: q.id,
+          correctAnswer: q.correctAnswer || "",
+        };
       });
     }
 
-    // Rebuild questions array
-    group.tableData.questions = questionIds.map((id) => ({
-      id: id,
-      correctAnswer: existingAnswers[id] || "",
-    }));
+    // Rebuild questions array with unique IDs
+    group.tableData.questions = questionNumbers.map((num) => {
+      if (existingByNumber[num]) {
+        // Keep existing ID and answer
+        return {
+          id: existingByNumber[num].id,
+          number: num,
+          correctAnswer: existingByNumber[num].correctAnswer,
+        };
+      } else {
+        // Create new question with unique ID
+        return {
+          id: idCounters.question++,
+          number: num,
+          correctAnswer: "",
+        };
+      }
+    });
 
     return group.tableData.questions;
   }
@@ -1220,7 +1254,7 @@ define([
       return "";
     }
 
-    const letters = ["A", "B", "C", "D", "E", "F"];
+    const letters = ["A", "B", "C", "D", "E", "F", "G", "H"];
     let html = '<div class="options-list mb-2">';
 
     question.options.forEach((opt, idx) => {
@@ -1235,6 +1269,11 @@ define([
                         value="${escapeHtml(opt)}" placeholder="Option ${
                           letters[idx] || idx + 1
                         }">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-outline-danger btn-sm remove-option" data-index="${idx}">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
                 </div>
             `;
     });
@@ -1263,6 +1302,26 @@ define([
       );
       container.html(renderQuestionTypeEditor(question));
       updateBuilderJson();
+    }
+  }
+
+  /**
+   * Remove option from a question
+   */
+  function removeOption(questionId, index) {
+    let question = findQuestionById(questionId);
+    if (question && question.options && question.options.length > 2) {
+      question.options.splice(index, 1);
+
+      // Re-render options
+      const container = $(
+        `.question-item[data-question-id="${questionId}"] .options-container`,
+      );
+      container.html(renderQuestionTypeEditor(question));
+      updateBuilderJson();
+    } else if (question && question.options && question.options.length <= 2) {
+      // Don't allow removing if only 2 options left
+      alert("A question must have at least 2 options.");
     }
   }
 

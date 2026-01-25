@@ -528,103 +528,120 @@ const ResultPage = ({ config }: ResultPageProps) => {
       <div className={styles.reviewWithPassage}>
         {/* Questions Panel */}
         <div className={styles.questionsPanel}>
-          {currentPassage.groups.map((group) => (
-            <div key={group.id} className={styles.questionGroup}>
-              <div className={styles.groupTitle}>{group.title}</div>
-              <div className={styles.groupInstruction}>{group.instruction}</div>
+          {currentPassage.groups.map((group) => {
+            // Get questions from either tableData (for TABLE_COMPLETION) or regular questions
+            const groupQuestions =
+              group.groupType === "TABLE_COMPLETION" &&
+              group.tableData?.questions
+                ? group.tableData.questions.map((tq) => ({
+                    id: tq.id,
+                    text: `Table Question ${tq.id}`,
+                    type: "TABLE_COMPLETION" as const,
+                    correctAnswer: tq.correctAnswer,
+                    options: undefined,
+                  }))
+                : group.questions;
 
-              {group.questions.map((q) => {
-                const userAns = answers[q.id] || "";
-                const correctAns =
-                  q.correctAnswer || answerKeyMap[q.id] || "N/A";
-                const isCorrect =
-                  userAns.toString().trim().toLowerCase() ===
-                  correctAns.toString().trim().toLowerCase();
+            return (
+              <div key={group.id} className={styles.questionGroup}>
+                <div className={styles.groupTitle}>{group.title}</div>
+                <div className={styles.groupInstruction}>
+                  {group.instruction}
+                </div>
 
-                return (
-                  <div key={q.id} className={styles.reviewQuestion}>
-                    <div className={styles.questionRow}>
-                      <span
-                        className={`${styles.qNumber} ${
-                          isCorrect ? styles.correct : styles.incorrect
-                        }`}
-                      >
-                        {q.id}
-                      </span>
-                      {q.type === "MULTIPLE_CHOICE" && q.options && (
-                        <select
-                          className={styles.answerSelect}
-                          value={userAns}
-                          disabled
-                        >
-                          <option value="">Select</option>
-                          {q.options.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      <span
-                        className={styles.questionText}
-                        dangerouslySetInnerHTML={{ __html: q.text }}
-                      />
-                    </div>
+                {groupQuestions.map((q) => {
+                  const userAns = answers[q.id] || "";
+                  const correctAns =
+                    q.correctAnswer || answerKeyMap[q.id] || "N/A";
+                  const isCorrect =
+                    userAns.toString().trim().toLowerCase() ===
+                    correctAns.toString().trim().toLowerCase();
 
-                    <div className={styles.answerFeedback}>
-                      <div className={styles.answerComparison}>
-                        <span className={styles.yourAnswer}>
-                          Your answer:{" "}
-                          <strong>{userAns || "(no answer)"}</strong>
-                        </span>
+                  return (
+                    <div key={q.id} className={styles.reviewQuestion}>
+                      <div className={styles.questionRow}>
                         <span
-                          className={`${styles.answerLabel} ${
-                            isCorrect
-                              ? styles.correctLabel
-                              : styles.incorrectLabel
+                          className={`${styles.qNumber} ${
+                            isCorrect ? styles.correct : styles.incorrect
                           }`}
                         >
-                          Correct: <strong>{correctAns}</strong>
-                          {isCorrect ? " ✓" : " ✗"}
+                          {q.id}
                         </span>
+                        {q.type === "MULTIPLE_CHOICE" && q.options && (
+                          <select
+                            className={styles.answerSelect}
+                            value={userAns}
+                            disabled
+                          >
+                            <option value="">Select</option>
+                            {q.options.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <span
+                          className={styles.questionText}
+                          dangerouslySetInnerHTML={{ __html: q.text }}
+                        />
                       </div>
 
-                      <div className={styles.actionBtns}>
-                        <Tooltip title="Locate in passage">
-                          <Button
-                            size="small"
-                            icon={<AimOutlined />}
-                            onClick={() => handleLocate(q.id)}
+                      <div className={styles.answerFeedback}>
+                        <div className={styles.answerComparison}>
+                          <span className={styles.yourAnswer}>
+                            Your answer:{" "}
+                            <strong>{userAns || "(no answer)"}</strong>
+                          </span>
+                          <span
+                            className={`${styles.answerLabel} ${
+                              isCorrect
+                                ? styles.correctLabel
+                                : styles.incorrectLabel
+                            }`}
                           >
-                            Locate
-                          </Button>
-                        </Tooltip>
-                        <Tooltip title="View explanation">
-                          <Button
-                            size="small"
-                            icon={<CommentOutlined />}
-                            onClick={() => handleExplain(q.id)}
-                          >
-                            Explain
-                          </Button>
-                        </Tooltip>
-                        <Tooltip title="Report issue">
-                          <Button
-                            size="small"
-                            icon={<WarningOutlined />}
-                            onClick={() => handleReport(q.id)}
-                            danger
-                          >
-                            Report
-                          </Button>
-                        </Tooltip>
+                            Correct: <strong>{correctAns}</strong>
+                            {isCorrect ? " ✓" : " ✗"}
+                          </span>
+                        </div>
+
+                        <div className={styles.actionBtns}>
+                          <Tooltip title="Locate in passage">
+                            <Button
+                              size="small"
+                              icon={<AimOutlined />}
+                              onClick={() => handleLocate(q.id)}
+                            >
+                              Locate
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="View explanation">
+                            <Button
+                              size="small"
+                              icon={<CommentOutlined />}
+                              onClick={() => handleExplain(q.id)}
+                            >
+                              Explain
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="Report issue">
+                            <Button
+                              size="small"
+                              icon={<WarningOutlined />}
+                              onClick={() => handleReport(q.id)}
+                              danger
+                            >
+                              Report
+                            </Button>
+                          </Tooltip>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                  );
+                })}
+              </div>
+            );
+          })}
 
           {/* Navigation */}
           <div className={styles.partNavigation}>
@@ -705,89 +722,106 @@ const ResultPage = ({ config }: ResultPageProps) => {
             />
           </div>
 
-          {currentSection.groups.map((group) => (
-            <div key={group.id} className={styles.questionGroup}>
-              <div className={styles.groupTitle}>{group.title}</div>
-              <div className={styles.groupInstruction}>{group.instruction}</div>
+          {currentSection.groups.map((group) => {
+            // Get questions from either tableData (for TABLE_COMPLETION) or regular questions
+            const groupQuestions =
+              group.groupType === "TABLE_COMPLETION" &&
+              group.tableData?.questions
+                ? group.tableData.questions.map((tq) => ({
+                    id: tq.id,
+                    text: `Table Question ${tq.id}`,
+                    type: "TABLE_COMPLETION" as const,
+                    correctAnswer: tq.correctAnswer,
+                    options: undefined,
+                  }))
+                : group.questions;
 
-              {group.questions.map((q) => {
-                const userAns = answers[q.id] || "";
-                const correctAns =
-                  q.correctAnswer || answerKeyMap[q.id] || "N/A";
-                const isCorrect =
-                  userAns.toString().trim().toLowerCase() ===
-                  correctAns.toString().trim().toLowerCase();
+            return (
+              <div key={group.id} className={styles.questionGroup}>
+                <div className={styles.groupTitle}>{group.title}</div>
+                <div className={styles.groupInstruction}>
+                  {group.instruction}
+                </div>
 
-                return (
-                  <div key={q.id} className={styles.reviewQuestion}>
-                    <div className={styles.questionRow}>
-                      <span
-                        className={`${styles.qNumber} ${
-                          isCorrect ? styles.correct : styles.incorrect
-                        }`}
-                      >
-                        {q.id}
-                      </span>
-                      <span
-                        className={styles.questionText}
-                        dangerouslySetInnerHTML={{ __html: q.text }}
-                      />
-                    </div>
+                {groupQuestions.map((q) => {
+                  const userAns = answers[q.id] || "";
+                  const correctAns =
+                    q.correctAnswer || answerKeyMap[q.id] || "N/A";
+                  const isCorrect =
+                    userAns.toString().trim().toLowerCase() ===
+                    correctAns.toString().trim().toLowerCase();
 
-                    <div className={styles.answerFeedback}>
-                      <div className={styles.answerComparison}>
-                        <span className={styles.yourAnswer}>
-                          Your answer:{" "}
-                          <strong>{userAns || "(no answer)"}</strong>
-                        </span>
+                  return (
+                    <div key={q.id} className={styles.reviewQuestion}>
+                      <div className={styles.questionRow}>
                         <span
-                          className={`${styles.answerLabel} ${
-                            isCorrect
-                              ? styles.correctLabel
-                              : styles.incorrectLabel
+                          className={`${styles.qNumber} ${
+                            isCorrect ? styles.correct : styles.incorrect
                           }`}
                         >
-                          Correct: <strong>{correctAns}</strong>
-                          {isCorrect ? " ✓" : " ✗"}
+                          {q.id}
                         </span>
+                        <span
+                          className={styles.questionText}
+                          dangerouslySetInnerHTML={{ __html: q.text }}
+                        />
                       </div>
 
-                      <div className={styles.actionBtns}>
-                        <Tooltip title="Listen to section">
-                          <Button
-                            size="small"
-                            icon={<SoundOutlined />}
-                            onClick={() => handleLocate(q.id)}
+                      <div className={styles.answerFeedback}>
+                        <div className={styles.answerComparison}>
+                          <span className={styles.yourAnswer}>
+                            Your answer:{" "}
+                            <strong>{userAns || "(no answer)"}</strong>
+                          </span>
+                          <span
+                            className={`${styles.answerLabel} ${
+                              isCorrect
+                                ? styles.correctLabel
+                                : styles.incorrectLabel
+                            }`}
                           >
-                            Listen
-                          </Button>
-                        </Tooltip>
-                        <Tooltip title="View explanation">
-                          <Button
-                            size="small"
-                            icon={<CommentOutlined />}
-                            onClick={() => handleExplain(q.id)}
-                          >
-                            Explain
-                          </Button>
-                        </Tooltip>
-                        <Tooltip title="Report issue">
-                          <Button
-                            size="small"
-                            icon={<WarningOutlined />}
-                            onClick={() => handleReport(q.id)}
-                            danger
-                          >
-                            Report
-                          </Button>
-                        </Tooltip>
+                            Correct: <strong>{correctAns}</strong>
+                            {isCorrect ? " ✓" : " ✗"}
+                          </span>
+                        </div>
+
+                        <div className={styles.actionBtns}>
+                          <Tooltip title="Listen to section">
+                            <Button
+                              size="small"
+                              icon={<SoundOutlined />}
+                              onClick={() => handleLocate(q.id)}
+                            >
+                              Listen
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="View explanation">
+                            <Button
+                              size="small"
+                              icon={<CommentOutlined />}
+                              onClick={() => handleExplain(q.id)}
+                            >
+                              Explain
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="Report issue">
+                            <Button
+                              size="small"
+                              icon={<WarningOutlined />}
+                              onClick={() => handleReport(q.id)}
+                              danger
+                            >
+                              Report
+                            </Button>
+                          </Tooltip>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                  );
+                })}
+              </div>
+            );
+          })}
 
           {/* Navigation */}
           <div className={styles.partNavigation}>
