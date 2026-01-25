@@ -295,7 +295,9 @@ define([
       if (group && group.tableData) {
         // Resize headers
         while (group.tableData.headers.length < newCols) {
-          group.tableData.headers.push("Column " + (group.tableData.headers.length + 1));
+          group.tableData.headers.push(
+            "Column " + (group.tableData.headers.length + 1),
+          );
         }
         group.tableData.headers = group.tableData.headers.slice(0, newCols);
 
@@ -365,7 +367,9 @@ define([
 
       const group = findGroupById(groupId);
       if (group && group.tableData && group.tableData.questions) {
-        const question = group.tableData.questions.find((q) => q.id === questionId);
+        const question = group.tableData.questions.find(
+          (q) => q.id === questionId,
+        );
         if (question) {
           question.correctAnswer = $(this).val();
           updateBuilderJson();
@@ -679,7 +683,7 @@ define([
          </button>`;
 
     const html = `
-            <div class="question-group card mb-2" data-group-id="${group.id}" data-group-type="${group.groupType || 'NORMAL'}">
+            <div class="question-group card mb-2" data-group-id="${group.id}" data-group-type="${group.groupType || "NORMAL"}">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
                     <input type="text" class="form-control-plaintext group-title font-weight-bold" 
                         value="${escapeHtml(
@@ -696,7 +700,7 @@ define([
                     </button>
                 </div>
                 <div class="card-body py-2">
-                    <div class="form-group mb-2 group-instruction-container" style="${isTableGroup ? 'display:none;' : ''}">
+                    <div class="form-group mb-2 group-instruction-container" style="${isTableGroup ? "display:none;" : ""}">
                         <input type="text" class="form-control form-control-sm group-instruction" 
                             value="${escapeHtml(group.instruction || "")}" 
                             placeholder="Instructions (e.g., Choose the correct letter A, B, C or D)">
@@ -1881,9 +1885,12 @@ define([
     const groupEl = $(`.question-group[data-group-id="${group.id}"]`);
     group.title = groupEl.find(".group-title").val() || group.title;
     group.instruction = groupEl.find(".group-instruction").val() || "";
-    
+
     // Get group type from DOM
-    const groupType = groupEl.find(".group-type-select").val() || groupEl.data("group-type") || "NORMAL";
+    const groupType =
+      groupEl.find(".group-type-select").val() ||
+      groupEl.data("group-type") ||
+      "NORMAL";
     group.groupType = groupType;
 
     // Handle TABLE_COMPLETION groups
@@ -1901,9 +1908,11 @@ define([
         const numCols = headers.length;
         tableEditor.find("tbody tr").each(function () {
           const row = [];
-          $(this).find(".table-cell-input").each(function () {
-            row.push($(this).val());
-          });
+          $(this)
+            .find(".table-cell-input")
+            .each(function () {
+              row.push($(this).val());
+            });
           if (row.length > 0) {
             rows.push(row);
           }
