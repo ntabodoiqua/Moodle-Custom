@@ -228,6 +228,24 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->addRule('grade', null, 'numeric', null, 'client');
 
         // -------------------------------------------------------
+        // Attempt settings.
+        // -------------------------------------------------------
+        $mform->addElement('header', 'attemptsheader', get_string('attemptsettings', 'mod_ielts'));
+        
+        $attemptoptions = [
+            0 => get_string('attemptsunlimited', 'mod_ielts'),
+            1 => '1',
+            2 => '2',
+            3 => '3',
+            4 => '4',
+            5 => '5',
+            10 => '10',
+        ];
+        $mform->addElement('select', 'maxattempts', get_string('maxattempts', 'mod_ielts'), $attemptoptions);
+        $mform->setDefault('maxattempts', 0);
+        $mform->addHelpButton('maxattempts', 'maxattempts', 'mod_ielts');
+
+        // -------------------------------------------------------
         // Standard course module elements.
         // -------------------------------------------------------
         $this->standard_coursemodule_elements();
@@ -236,6 +254,90 @@ class mod_ielts_mod_form extends moodleform_mod {
         // Action buttons.
         // -------------------------------------------------------
         $this->add_action_buttons();
+    }
+
+    /**
+     * Add any custom completion rules to the form.
+     *
+     * @return array List of added completion elements.
+     */
+    public function add_completion_rules() {
+        $mform =& $this->_form;
+
+        // Completion on submission.
+        $group = [];
+        $group[] =& $mform->createElement('checkbox', 'completionsubmit', '', 
+            get_string('completionsubmit', 'mod_ielts'));
+        $mform->addGroup($group, 'completionsubmitgroup', 
+            get_string('completionsubmit', 'mod_ielts'), [''], false);
+        $mform->addHelpButton('completionsubmitgroup', 'completionsubmit', 'mod_ielts');
+        $mform->hideIf('completionsubmitgroup', 'completion', 'ne', COMPLETION_TRACKING_AUTOMATIC);
+
+        // Completion on minimum grade.
+        $group = [];
+        $group[] =& $mform->createElement('checkbox', 'completionusegrade', '',
+            get_string('completionusegrade', 'mod_ielts'));
+        $group[] =& $mform->createElement('text', 'completionmingrade', '',
+            ['size' => '3', 'optional' => true]);
+        $mform->setType('completionmingrade', PARAM_FLOAT);
+        $mform->addGroup($group, 'completionmingradegroup',
+            get_string('completionmingradegroup', 'mod_ielts'), [' '], false);
+        $mform->addHelpButton('completionmingradegroup', 'completionmingrade', 'mod_ielts');
+        $mform->hideIf('completionmingradegroup', 'completion', 'ne', COMPLETION_TRACKING_AUTOMATIC);
+        $mform->hideIf('completionmingrade', 'completionusegrade', 'notchecked');
+
+        // Completion on pass grade.
+        $group = [];
+        $group[] =& $mform->createElement('checkbox', 'completionpassgrade', '',
+            get_string('completionpassgrade', 'mod_ielts'));
+        $mform->addGroup($group, 'completionpassgradegroup',
+            get_string('completionpassgrade', 'mod_ielts'), [''], false);
+        $mform->addHelpButton('completionpassgradegroup', 'completionpassgrade', 'mod_ielts');
+        $mform->hideIf('completionpassgradegroup', 'completion', 'ne', COMPLETION_TRACKING_AUTOMATIC);
+
+        return ['completionsubmitgroup', 'completionmingradegroup', 'completionpassgradegroup'];
+    }
+
+    /**
+     * Called during validation to see whether the custom completion rules are enabled.
+     *
+     * @param array $data Input data not yet validated.
+     * @return bool True if one or more rules is enabled, false if none are.
+     */
+    public function completion_rule_enabled($data) {
+        return (!empty($data['completionsubmit']) ||
+                !empty($data['completionusegrade']) ||
+                !empty($data['completionpassgrade']));
+    }
+
+    /**
+     * Allows module to modify the data returned by form->get_data().
+     * This method is also called in the bulk activity completion form.
+     *
+     * Only available on moodleform_mod.
+     *
+     * @param stdClass $data the form data to be modified.
+     */
+    public function data_postprocessing($data) {
+        parent::data_postprocessing($data);
+        
+        // Set up completion checkboxes which aren't part of standard data.
+        if (!empty($data->completionunlocked)) {
+            // Turn off completion settings if the checkboxes aren't ticked.
+            $autocompletion = !empty($data->completion) && $data->completion == COMPLETION_TRACKING_AUTOMATIC;
+            
+            if (!$autocompletion || empty($data->completionsubmit)) {
+                $data->completionsubmit = 0;
+            }
+            
+            if (!$autocompletion || empty($data->completionusegrade)) {
+                $data->completionusegrade = 0;
+            }
+            
+            if (!$autocompletion || empty($data->completionpassgrade)) {
+                $data->completionpassgrade = 0;
+            }
+        }
     }
 
     /**

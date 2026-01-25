@@ -95,5 +95,19 @@ function xmldb_ielts_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026012500, 'ielts');
     }
 
+    if ($oldversion < 2026012502) {
+        // Define field maxattempts to be added to ielts.
+        $table = new xmldb_table('ielts');
+        $field = new xmldb_field('maxattempts', XMLDB_TYPE_INTEGER, '6', null, XMLDB_NOTNULL, null, '0', 'grade');
+
+        // Conditionally launch add field maxattempts.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Ielts savepoint reached.
+        upgrade_mod_savepoint(true, 2026012502, 'ielts');
+    }
+
     return true;
 }

@@ -13,6 +13,7 @@
         <FIELD NAME="introformat" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Format of the intro field (MOODLE, HTML, PLAIN, MARKDOWN)"/>
         <FIELD NAME="content_json" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Full JSON object containing exam data (ExamData interface)"/>
         <FIELD NAME="grade" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="9" SEQUENCE="false" COMMENT="Maximum grade (IELTS band scale 0-9)"/>
+        <FIELD NAME="maxattempts" TYPE="int" LENGTH="6" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Maximum number of attempts allowed (0 = unlimited)"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Timestamp when the activity was created"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Timestamp when the activity was last modified"/>
       </FIELDS>

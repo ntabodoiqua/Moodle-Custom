@@ -156,6 +156,15 @@ $string['lastattempt'] = 'Last attempt';
 $string['firstattempt'] = 'First attempt';
 $string['averageattempt'] = 'Average of all attempts';
 
+// Attempt settings.
+$string['attemptsettings'] = 'Attempt Settings';
+$string['maxattempts'] = 'Maximum attempts';
+$string['maxattempts_help'] = 'The maximum number of attempts a student can make on this test. Set to 0 for unlimited attempts.';
+$string['attemptsunlimited'] = 'Unlimited';
+$string['attemptsremaining'] = '{$a} attempt(s) remaining';
+$string['noattemptsremaining'] = 'No attempts remaining';
+$string['totalattempts'] = 'Total Attempts';
+
 // Error strings.
 $string['invalidieltsid'] = 'Invalid IELTS exam ID';
 $string['cannotviewattempt'] = 'You cannot view this attempt';
@@ -359,3 +368,22 @@ $string['nopermission'] = 'You do not have permission to view this attempt';
 // Events.
 $string['eventattemptsubmitted'] = 'IELTS attempt submitted';
 $string['eventcoursemoduleviewed'] = 'IELTS activity viewed';
+
+// ==========================================================
+// COMPLETION STRINGS
+// ==========================================================
+
+// Completion conditions.
+$string['completionsubmit'] = 'Student must submit an attempt';
+$string['completionsubmit_help'] = 'The activity is considered complete when the student submits at least one attempt.';
+$string['completionusegrade'] = 'Student must achieve a minimum band score';
+$string['completionmingrade'] = 'Minimum band score';
+$string['completionmingradegroup'] = 'Student must achieve a minimum band score';
+$string['completionmingrade_help'] = 'The activity is considered complete when the student achieves at least the specified band score.';
+$string['completionpassgrade'] = 'Student must achieve the pass grade';
+$string['completionpassgrade_help'] = 'The activity is considered complete when the student achieves the pass grade or higher.';
+
+// Completion details (for activity listing).
+$string['completiondetail:submit'] = 'Submit an attempt';
+$string['completiondetail:grade'] = 'Achieve band score of at least {$a}';
+$string['completiondetail:passgrade'] = 'Achieve the pass grade';

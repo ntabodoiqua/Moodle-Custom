@@ -10,7 +10,6 @@ import {
   ClockCircleOutlined,
   TrophyOutlined,
   PercentageOutlined,
-  ReloadOutlined,
   HomeOutlined,
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -372,17 +371,12 @@ const ResultPage = ({ config }: ResultPageProps) => {
     }
   };
 
-  // Handle retake (not shown in review mode)
-  const handleRetake = () => {
-    window.location.reload();
-  };
-
   // Handle back to overview (for review mode)
   const handleBackToOverview = () => {
     if (config?.backUrl) {
       window.location.href = config.backUrl;
-    } else if (config?.wwwroot && config?.instanceId) {
-      window.location.href = `${config.wwwroot}/mod/ielts/view.php?id=${config.instanceId}`;
+    } else if (config?.wwwroot && config?.cmId) {
+      window.location.href = `${config.wwwroot}/mod/ielts/view.php?id=${config.cmId}`;
     } else {
       window.history.back();
     }
@@ -1379,11 +1373,11 @@ const ResultPage = ({ config }: ResultPageProps) => {
             <>
               <Button
                 size="large"
-                icon={<ReloadOutlined />}
-                onClick={handleRetake}
+                icon={<LeftOutlined />}
+                onClick={handleBackToOverview}
                 className={`${styles.actionButton} ${styles.secondaryButton}`}
               >
-                Retake Test
+                Back to Test
               </Button>
               <Button
                 type="primary"

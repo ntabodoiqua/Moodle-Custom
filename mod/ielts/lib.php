@@ -46,6 +46,10 @@ function ielts_supports($feature) {
             return true;
         case FEATURE_COMPLETION_HAS_RULES:
             return true;
+        case FEATURE_PLAGIARISM:
+            return false;
+        case FEATURE_ADVANCED_GRADING:
+            return false;
         case FEATURE_GROUPS:
             return false;
         case FEATURE_GROUPINGS:
@@ -476,13 +480,85 @@ function ielts_pluginfile($course, $cm, $context, $filearea, $args, $forcedownlo
 function ielts_get_completion_state($course, $cm, $userid, $type) {
     global $DB;
 
-    // Check if user has at least one completed attempt.
-    $hasattempt = $DB->record_exists('ielts_attempts', [
-        'ieltsid' => $cm->instance,
-        'userid' => $userid,
-    ]);
+    // Get the IELTS instance.
+    $ielts = $DB->get_record('ielts', ['id' => $cm->instance], '*', MUST_EXIST);
+    
+    $result = $type; // Default to passed type (or/and)
 
-    return $hasattempt;
+    // Basic completion: check if user has at least one completed attempt.
+    if (!empty($cm->customdata['customcompletionrules']['completionsubmit'])) {
+        $hasattempt = $DB->record_exists('ielts_attempts', [
+            'ieltsid' => $cm->instance,
+            'userid' => $userid,
+        ]);
+        $result = $result && $hasattempt;
+    }
+
+    // Completion rule: minimum grade/band score required.
+    if (!empty($cm->customdata['customcompletionrules']['completionusegrade'])) {
+        $requiredgrade = floatval($cm->customdata['customcompletionrules']['completionmingrade'] ?? 0);
+        
+        if ($requiredgrade > 0) {
+            // Get user's best attempt.
+            $bestband = $DB->get_field('ielts_attempts', 'MAX(final_band)', [
+                'ieltsid' => $cm->instance,
+                'userid' => $userid,
+            ]);
+            
+            $gradeachieved = ($bestband && $bestband >= $requiredgrade);
+            $result = $result && $gradeachieved;
+        }
+    }
+
+    // Completion rule: pass grade required.
+    if (!empty($cm->customdata['customcompletionrules']['completionpassgrade'])) {
+        $passgrade = grade_get_setting($course->id, 'mingradetopass', $cm->instance, $ielts->grade * 0.6); // Default 60%
+        
+        // Get user's best attempt.
+        $bestband = $DB->get_field('ielts_attempts', 'MAX(final_band)', [
+            'ieltsid' => $cm->instance,
+            'userid' => $userid,
+        ]);
+        
+        $passachieved = ($bestband && $bestband >= $passgrade);
+        $result = $result && $passachieved;
+    }
+
+    return $result;
+}
+
+/**
+ * Check if completion is enabled for this activity and that there are
+ * custom completion rules.
+ *
+ * @param cm_info|stdClass $cm course-module
+ * @return bool True if completion is enabled and there are custom completion rules,
+ *   false otherwise.
+ */
+function ielts_completion_get_active_rule_descriptions($cm) {
+    if (empty($cm->customdata['customcompletionrules']) || $cm->completion != COMPLETION_TRACKING_AUTOMATIC) {
+        return [];
+    }
+
+    $descriptions = [];
+    
+    // Submit attempt rule.
+    if (!empty($cm->customdata['customcompletionrules']['completionsubmit'])) {
+        $descriptions[] = get_string('completiondetail:submit', 'mod_ielts');
+    }
+    
+    // Minimum grade rule.
+    if (!empty($cm->customdata['customcompletionrules']['completionusegrade'])) {
+        $mingrade = $cm->customdata['customcompletionrules']['completionmingrade'] ?? 0;
+        $descriptions[] = get_string('completiondetail:grade', 'mod_ielts', $mingrade);
+    }
+    
+    // Pass grade rule.
+    if (!empty($cm->customdata['customcompletionrules']['completionpassgrade'])) {
+        $descriptions[] = get_string('completiondetail:passgrade', 'mod_ielts');
+    }
+    
+    return $descriptions;
 }
 
 // ============================================================

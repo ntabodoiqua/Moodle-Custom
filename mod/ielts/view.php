@@ -182,6 +182,15 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         }
     }
 
+    // Check if user can make more attempts.
+    $canmakeattempt = true;
+    $attemptsremaining = -1; // -1 means unlimited.
+    
+    if ($ielts->maxattempts > 0) {
+        $attemptsremaining = $ielts->maxattempts - $attemptcount;
+        $canmakeattempt = $attemptsremaining > 0;
+    }
+
     // Teacher grading link (if user has grade capability).
     if (has_capability('mod/ielts:grade', $context)) {
         $examdata = json_decode($ielts->content_json, true);
@@ -225,11 +234,28 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
     echo html_writer::end_div();
 
     echo html_writer::start_div('col-md-4 text-center d-flex align-items-center justify-content-center py-3');
-    $attempturl = new moodle_url('/mod/ielts/view.php', ['id' => $cm->id, 'action' => 'attempt']);
-    echo html_writer::link($attempturl,
-        '<i class="fa fa-play-circle mr-2"></i>' . get_string('startnewattempt', 'mod_ielts'),
-        ['class' => 'btn btn-primary btn-lg']
-    );
+    
+    if ($canmakeattempt) {
+        $attempturl = new moodle_url('/mod/ielts/view.php', ['id' => $cm->id, 'action' => 'attempt']);
+        echo html_writer::link($attempturl,
+            '<i class="fa fa-play-circle mr-2"></i>' . get_string('startnewattempt', 'mod_ielts'),
+            ['class' => 'btn btn-primary btn-lg']
+        );
+        
+        // Show attempts remaining if limited.
+        if ($attemptsremaining > 0) {
+            echo html_writer::tag('div', 
+                get_string('attemptsremaining', 'mod_ielts', $attemptsremaining),
+                ['class' => 'text-muted small mt-2']
+            );
+        }
+    } else {
+        echo html_writer::tag('div',
+            '<i class="fa fa-ban mr-2"></i>' . get_string('noattemptsremaining', 'mod_ielts'),
+            ['class' => 'text-danger']
+        );
+    }
+    
     echo html_writer::end_div();
     echo html_writer::end_div();
 

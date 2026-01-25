@@ -176,6 +176,18 @@ try {
             $context = context_module::instance($cm->id);
             require_capability('mod/ielts:submit', $context);
 
+            // Check attempt limit.
+            if ($ielts->maxattempts > 0) {
+                $attemptcount = $DB->count_records('ielts_attempts', [
+                    'ieltsid' => $ielts->id,
+                    'userid' => $USER->id,
+                ]);
+                
+                if ($attemptcount >= $ielts->maxattempts) {
+                    send_error_response('You have reached the maximum number of attempts for this test.');
+                }
+            }
+
             // Validate results JSON.
             $results = json_decode($resultsraw, true);
             if (json_last_error() !== JSON_ERROR_NONE) {

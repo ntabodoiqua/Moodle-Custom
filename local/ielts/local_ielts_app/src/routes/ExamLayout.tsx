@@ -242,19 +242,46 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
 
   const handleTimeOut = () => {
     message.warning("Time's up for this section!");
-    handleNextSkill();
+    handleNextSkill(true); // Pass true to indicate timeout
   };
 
   // Dynamic skill navigation based on available skills
-  const handleNextSkill = () => {
+  const handleNextSkill = (isTimeout = false) => {
     const nextSkill = getNextSkill(currentSkill, availableSkills);
 
     if (nextSkill) {
       setSkill(nextSkill, getEffectiveDuration(nextSkill));
     } else {
       // No more skills, submit the exam
-      handleSubmit();
+      // If timeout, auto-submit without confirmation
+      if (isTimeout) {
+        handleAutoSubmit();
+      } else {
+        handleSubmit();
+      }
     }
+  };
+
+  // Auto-submit when time runs out (no confirmation)
+  const handleAutoSubmit = async () => {
+    message.info("Time's up! Automatically submitting your exam...");
+
+    // Mark as submitted locally first to calculate timeTaken
+    submitExam();
+
+    // Then try to submit to API
+    const attemptId = await submitAssessment();
+
+    if (attemptId) {
+      message.success(`Exam submitted successfully! (Attempt #${attemptId})`);
+    } else {
+      message.success("Exam submitted successfully!");
+    }
+
+    // Navigate to result
+    setTimeout(() => {
+      navigate(ROUTES.RESULT, { replace: true });
+    }, 50);
   };
 
   const handleSubmit = () => {
@@ -265,7 +292,10 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
       okText: "Yes, Submit",
       cancelText: "No, keep working",
       onOk: async () => {
-        // Try to submit to API first
+        // Mark as submitted locally first to calculate timeTaken
+        submitExam();
+
+        // Then try to submit to API
         const attemptId = await submitAssessment();
 
         if (attemptId) {
@@ -273,8 +303,6 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
             `Exam submitted successfully! (Attempt #${attemptId})`,
           );
         } else {
-          // Fallback: just mark as submitted locally
-          submitExam();
           message.success("Exam submitted successfully!");
         }
 
@@ -489,7 +517,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
               <Button
                 type="primary"
                 icon={<RightOutlined />}
-                onClick={handleNextSkill}
+                onClick={() => handleNextSkill(false)}
                 style={{
                   backgroundColor: "#2563eb",
                   borderColor: "#2563eb",
