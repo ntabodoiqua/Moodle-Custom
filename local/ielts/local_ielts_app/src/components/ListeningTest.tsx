@@ -7,6 +7,7 @@ import {
 } from "@ant-design/icons";
 import { useExamStore } from "../store/examStore";
 import QuestionRenderer from "./QuestionRenderer";
+import TableQuestion, { extractTableQuestionIds } from "./TableQuestion";
 import styles from "./ListeningTest.module.css";
 
 interface ListeningTestProps {
@@ -29,16 +30,23 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
   // Get current section
   const currentSection = sections[currentSectionIndex];
 
-  // Get all question IDs for current section
+  // Get all question IDs for current section (including table questions)
   const currentQuestionIds = useMemo(() => {
     if (!currentSection) return [];
     const ids: number[] = [];
     currentSection.groups.forEach((group) => {
-      group.questions.forEach((q) => {
-        ids.push(q.id);
-      });
+      // Check if this is a table completion group
+      if (group.groupType === "TABLE_COMPLETION" && group.tableData) {
+        const tableQuestionIds = extractTableQuestionIds(group.tableData);
+        ids.push(...tableQuestionIds);
+      } else {
+        // Normal questions
+        group.questions.forEach((q) => {
+          ids.push(q.id);
+        });
+      }
     });
-    return ids;
+    return ids.sort((a, b) => a - b);
   }, [currentSection]);
 
   // Reset state when component mounts or examData changes
@@ -209,33 +217,45 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
             <div key={group.id} className={styles.questionSection}>
               <h3 className={styles.questionSectionTitle}>{group.title}</h3>
 
-              {group.instruction && (
+              {/* Render instruction only for non-table groups or custom instruction */}
+              {group.instruction && group.groupType !== "TABLE_COMPLETION" && (
                 <div className={styles.questionInstruction}>
                   {group.instruction}
                 </div>
               )}
 
-              {group.questions.map((question) => (
-                <div
-                  key={question.id}
-                  id={`listening-question-${question.id}`}
-                  className={styles.question}
-                >
-                  <div className={styles.questionNumber}>{question.id}.</div>
-                  <div className={styles.questionContent}>
-                    <div
-                      className={styles.questionText}
-                      dangerouslySetInnerHTML={{ __html: question.text }}
-                    />
+              {/* Render TABLE_COMPLETION group */}
+              {group.groupType === "TABLE_COMPLETION" && group.tableData ? (
+                <TableQuestion
+                  tableData={group.tableData}
+                  answers={answers}
+                  onAnswerChange={onAnswerChange}
+                  questionIdPrefix="listening-question-"
+                />
+              ) : (
+                /* Render normal questions */
+                group.questions.map((question) => (
+                  <div
+                    key={question.id}
+                    id={`listening-question-${question.id}`}
+                    className={styles.question}
+                  >
+                    <div className={styles.questionNumber}>{question.id}.</div>
+                    <div className={styles.questionContent}>
+                      <div
+                        className={styles.questionText}
+                        dangerouslySetInnerHTML={{ __html: question.text }}
+                      />
 
-                    <QuestionRenderer
-                      question={question}
-                      answer={answers[question.id]}
-                      onAnswerChange={onAnswerChange}
-                    />
+                      <QuestionRenderer
+                        question={question}
+                        answer={answers[question.id]}
+                        onAnswerChange={onAnswerChange}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           ))}
         </div>
@@ -275,9 +295,16 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
           {sections.map((section, index) => {
             if (index === currentSectionIndex) return null;
             const sectionQuestionIds: number[] = [];
-            section.groups.forEach((g) =>
-              g.questions.forEach((q) => sectionQuestionIds.push(q.id)),
-            );
+            section.groups.forEach((g) => {
+              // Handle TABLE_COMPLETION groups
+              if (g.groupType === "TABLE_COMPLETION" && g.tableData) {
+                const tableIds = extractTableQuestionIds(g.tableData);
+                sectionQuestionIds.push(...tableIds);
+              } else {
+                // Normal questions
+                g.questions.forEach((q) => sectionQuestionIds.push(q.id));
+              }
+            });
             const answered = sectionQuestionIds.filter(
               (id) => answers[id],
             ).length;

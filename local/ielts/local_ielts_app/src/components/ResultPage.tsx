@@ -90,22 +90,48 @@ const ResultPage = ({ config }: ResultPageProps) => {
     // Reading answers
     exam.reading?.forEach((passage) => {
       passage.groups.forEach((group) => {
-        group.questions.forEach((q) => {
-          if (q.correctAnswer) {
-            map[q.id] = q.correctAnswer;
-          }
-        });
+        // Handle TABLE_COMPLETION groups
+        if (
+          group.groupType === "TABLE_COMPLETION" &&
+          group.tableData?.questions
+        ) {
+          group.tableData.questions.forEach((tq) => {
+            if (tq.correctAnswer) {
+              map[tq.id] = tq.correctAnswer;
+            }
+          });
+        } else {
+          // Normal questions
+          group.questions.forEach((q) => {
+            if (q.correctAnswer) {
+              map[q.id] = q.correctAnswer;
+            }
+          });
+        }
       });
     });
 
     // Listening answers
     exam.listening?.forEach((section) => {
       section.groups.forEach((group) => {
-        group.questions.forEach((q) => {
-          if (q.correctAnswer) {
-            map[q.id] = q.correctAnswer;
-          }
-        });
+        // Handle TABLE_COMPLETION groups
+        if (
+          group.groupType === "TABLE_COMPLETION" &&
+          group.tableData?.questions
+        ) {
+          group.tableData.questions.forEach((tq) => {
+            if (tq.correctAnswer) {
+              map[tq.id] = tq.correctAnswer;
+            }
+          });
+        } else {
+          // Normal questions
+          group.questions.forEach((q) => {
+            if (q.correctAnswer) {
+              map[q.id] = q.correctAnswer;
+            }
+          });
+        }
       });
     });
 
@@ -122,20 +148,37 @@ const ResultPage = ({ config }: ResultPageProps) => {
       type: string;
       options?: string[];
       correctAnswer?: string;
+      isTableQuestion?: boolean;
     }[] = [];
     exam?.reading?.forEach((passage, partIndex) => {
       passage.groups.forEach((group) => {
-        group.questions.forEach((q) => {
-          questions.push({
-            id: q.id,
-            partIndex,
-            groupTitle: group.title,
-            text: q.text,
-            type: q.type,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
+        // Handle TABLE_COMPLETION groups
+        if (group.groupType === "TABLE_COMPLETION" && group.tableData) {
+          group.tableData.questions?.forEach((tq) => {
+            questions.push({
+              id: tq.id,
+              partIndex,
+              groupTitle: group.title,
+              text: `Table Question ${tq.id}`,
+              type: "TABLE_COMPLETION",
+              correctAnswer: tq.correctAnswer,
+              isTableQuestion: true,
+            });
           });
-        });
+        } else {
+          // Normal questions
+          group.questions.forEach((q) => {
+            questions.push({
+              id: q.id,
+              partIndex,
+              groupTitle: group.title,
+              text: q.text,
+              type: q.type,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+            });
+          });
+        }
       });
     });
     return questions;
@@ -150,20 +193,38 @@ const ResultPage = ({ config }: ResultPageProps) => {
       type: string;
       options?: string[];
       correctAnswer?: string;
+      isTableQuestion?: boolean;
     }[] = [];
     exam?.listening?.forEach((section, partIndex) => {
       section.groups.forEach((group) => {
-        group.questions.forEach((q) => {
-          questions.push({
-            id: q.id,
-            partIndex,
-            groupTitle: group.title,
-            text: q.text,
-            type: q.type,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
+        // Handle TABLE_COMPLETION groups
+        if (group.groupType === "TABLE_COMPLETION" && group.tableData) {
+          // Extract questions from tableData.questions if available
+          group.tableData.questions?.forEach((tq) => {
+            questions.push({
+              id: tq.id,
+              partIndex,
+              groupTitle: group.title,
+              text: `Table Question ${tq.id}`,
+              type: "TABLE_COMPLETION",
+              correctAnswer: tq.correctAnswer,
+              isTableQuestion: true,
+            });
           });
-        });
+        } else {
+          // Normal questions
+          group.questions.forEach((q) => {
+            questions.push({
+              id: q.id,
+              partIndex,
+              groupTitle: group.title,
+              text: q.text,
+              type: q.type,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+            });
+          });
+        }
       });
     });
     return questions;
@@ -460,7 +521,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
     }
 
     const passageQuestions = readingQuestions.filter(
-      (q) => q.partIndex === activeReadingPart
+      (q) => q.partIndex === activeReadingPart,
     );
 
     return (
@@ -625,7 +686,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
     }
 
     const sectionQuestions = listeningQuestions.filter(
-      (q) => q.partIndex === activeListeningPart
+      (q) => q.partIndex === activeListeningPart,
     );
 
     return (

@@ -48,7 +48,24 @@ export type QuestionType =
   | "MATCHING_SENTENCE_ENDINGS"
   | "MAP_LABELING"
   | "SHORT_ANSWER"
-  | "SUMMARY_COMPLETION";
+  | "SUMMARY_COMPLETION"
+  | "TABLE_COMPLETION";
+
+// Group types for special question layouts
+export type GroupType = "NORMAL" | "TABLE_COMPLETION";
+
+// Table question with correct answer (for scoring)
+export interface TableQuestion {
+  id: number; // Question ID that appears as [id] in cells
+  correctAnswer: string; // The correct answer for this question
+}
+
+// Table data structure for TABLE_COMPLETION groups
+export interface TableData {
+  headers: string[];
+  rows: string[][]; // Each cell can contain text or "[questionId]" pattern
+  questions?: TableQuestion[]; // Questions with correct answers for scoring
+}
 
 export interface Question {
   id: number;
@@ -68,6 +85,8 @@ export interface QuestionGroup {
   title: string; // Vd: "Questions 1-5"
   instruction: string; // Vd: "Choose the correct letter..."
   questions: Question[];
+  groupType?: GroupType; // Type of group layout (default: NORMAL)
+  tableData?: TableData; // Data for TABLE_COMPLETION groups
 }
 
 // --- READING ---

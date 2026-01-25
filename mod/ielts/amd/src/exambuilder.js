@@ -62,6 +62,12 @@ define([
     { value: "SUMMARY_COMPLETION", label: "Summary Completion" },
   ];
 
+  // Group types for question groups
+  const groupTypes = [
+    { value: "NORMAL", label: "Normal Questions" },
+    { value: "TABLE_COMPLETION", label: "Table Completion" },
+  ];
+
   /**
    * Initialize the exam builder
    */
@@ -223,6 +229,148 @@ define([
       e.preventDefault();
       const partId = $(this).data("part-id");
       addSpeakingQuestion(partId);
+    });
+
+    // Group type change handler
+    $(document).on("change", ".group-type-select", function () {
+      const groupEl = $(this).closest(".question-group");
+      const groupId = groupEl.data("group-id");
+      const newType = $(this).val();
+      const skill = groupEl.find(".delete-item").data("skill");
+      const parentId = groupEl.find(".delete-item").data("parent-id");
+
+      // Find the group in examData
+      const group = findGroupById(groupId);
+      if (group) {
+        group.groupType = newType;
+        groupEl.attr("data-group-type", newType);
+
+        // Toggle instruction visibility
+        if (newType === "TABLE_COMPLETION") {
+          groupEl.find(".group-instruction-container").hide();
+        } else {
+          groupEl.find(".group-instruction-container").show();
+        }
+
+        // Re-render the content area
+        const contentContainer = groupEl.find(".group-content-container");
+        if (newType === "TABLE_COMPLETION") {
+          // Initialize tableData if needed
+          if (!group.tableData) {
+            group.tableData = {
+              headers: ["Column 1", "Column 2"],
+              rows: [["", "[1]"]],
+              questions: [{ id: 1, correctAnswer: "" }],
+            };
+          }
+          contentContainer.html(renderTableEditor(group));
+        } else {
+          // Switch back to normal questions
+          contentContainer.html(`
+            <div class="questions-container" data-group-id="${group.id}"></div>
+            <button type="button" class="btn btn-sm btn-outline-info add-question" 
+                data-group-id="${group.id}" data-skill="${skill}">
+                <i class="fa fa-plus"></i> Add Question
+            </button>
+          `);
+          // Re-render existing questions if any
+          if (group.questions && group.questions.length > 0) {
+            group.questions.forEach(function (question) {
+              renderQuestion(group.id, question);
+            });
+          }
+        }
+        updateBuilderJson();
+      }
+    });
+
+    // Update table size
+    $(document).on("click", ".update-table-size", function () {
+      const tableEditor = $(this).closest(".table-editor");
+      const groupId = tableEditor.data("group-id");
+      const newCols = parseInt(tableEditor.find(".table-cols").val(), 10);
+      const newRows = parseInt(tableEditor.find(".table-rows").val(), 10);
+
+      const group = findGroupById(groupId);
+      if (group && group.tableData) {
+        // Resize headers
+        while (group.tableData.headers.length < newCols) {
+          group.tableData.headers.push("Column " + (group.tableData.headers.length + 1));
+        }
+        group.tableData.headers = group.tableData.headers.slice(0, newCols);
+
+        // Resize rows
+        while (group.tableData.rows.length < newRows) {
+          group.tableData.rows.push(Array(newCols).fill(""));
+        }
+        group.tableData.rows = group.tableData.rows.slice(0, newRows);
+
+        // Ensure each row has correct number of columns
+        group.tableData.rows = group.tableData.rows.map((row) => {
+          while (row.length < newCols) {
+            row.push("");
+          }
+          return row.slice(0, newCols);
+        });
+
+        // Update questions based on new cell content
+        updateTableQuestions(group);
+
+        // Re-render table
+        tableEditor.replaceWith(renderTableEditor(group));
+        updateBuilderJson();
+      }
+    });
+
+    // Update table header
+    $(document).on("input", ".table-header-input", function () {
+      const tableEditor = $(this).closest(".table-editor");
+      const groupId = tableEditor.data("group-id");
+      const colIdx = parseInt($(this).data("col"), 10);
+
+      const group = findGroupById(groupId);
+      if (group && group.tableData) {
+        group.tableData.headers[colIdx] = $(this).val();
+        updateBuilderJson();
+      }
+    });
+
+    // Update table cell
+    $(document).on("input", ".table-cell-input", function () {
+      const tableEditor = $(this).closest(".table-editor");
+      const groupId = tableEditor.data("group-id");
+      const rowIdx = parseInt($(this).data("row"), 10);
+      const colIdx = parseInt($(this).data("col"), 10);
+
+      const group = findGroupById(groupId);
+      if (group && group.tableData) {
+        group.tableData.rows[rowIdx][colIdx] = $(this).val();
+
+        // Update questions list based on cell content
+        updateTableQuestions(group);
+
+        // Re-render the questions section
+        const questionsSection = tableEditor.find(".table-questions-list");
+        questionsSection.html(renderTableQuestionsEditor(group));
+
+        updateBuilderJson();
+      }
+    });
+
+    // Update table question answer
+    $(document).on("input", ".table-question-answer", function () {
+      const tableEditor = $(this).closest(".table-editor");
+      const groupId = tableEditor.data("group-id");
+      const questionId = parseInt($(this).data("question-id"), 10);
+
+      const group = findGroupById(groupId);
+      if (group && group.tableData && group.tableData.questions) {
+        const question = group.tableData.questions.find((q) => q.id === questionId);
+        if (question) {
+          question.correctAnswer = $(this).val();
+          updateBuilderJson();
+        }
+      }
     });
   }
 
@@ -486,6 +634,7 @@ define([
       id: groupId,
       title: "Questions " + groupId,
       instruction: "",
+      groupType: "NORMAL",
       questions: [],
     };
 
@@ -511,13 +660,34 @@ define([
    * Render a question group
    */
   function renderQuestionGroup(parentId, group, skill) {
+    const groupTypeOptions = groupTypes
+      .map(
+        (t) =>
+          `<option value="${t.value}" ${
+            group.groupType === t.value ? "selected" : ""
+          }>${t.label}</option>`,
+      )
+      .join("");
+
+    const isTableGroup = group.groupType === "TABLE_COMPLETION";
+    const questionsContainerHtml = isTableGroup
+      ? renderTableEditor(group)
+      : `<div class="questions-container" data-group-id="${group.id}"></div>
+         <button type="button" class="btn btn-sm btn-outline-info add-question" 
+             data-group-id="${group.id}" data-skill="${skill}">
+             <i class="fa fa-plus"></i> Add Question
+         </button>`;
+
     const html = `
-            <div class="question-group card mb-2" data-group-id="${group.id}">
+            <div class="question-group card mb-2" data-group-id="${group.id}" data-group-type="${group.groupType || 'NORMAL'}">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
                     <input type="text" class="form-control-plaintext group-title font-weight-bold" 
                         value="${escapeHtml(
                           group.title,
-                        )}" placeholder="Group Title">
+                        )}" placeholder="Group Title" style="width: auto; flex: 1;">
+                    <select class="form-control form-control-sm group-type-select mx-2" style="width: 180px;">
+                        ${groupTypeOptions}
+                    </select>
                     <button type="button" class="btn btn-sm btn-outline-danger delete-item" 
                         data-type="group" data-id="${
                           group.id
@@ -526,18 +696,14 @@ define([
                     </button>
                 </div>
                 <div class="card-body py-2">
-                    <div class="form-group mb-2">
+                    <div class="form-group mb-2 group-instruction-container" style="${isTableGroup ? 'display:none;' : ''}">
                         <input type="text" class="form-control form-control-sm group-instruction" 
                             value="${escapeHtml(group.instruction || "")}" 
                             placeholder="Instructions (e.g., Choose the correct letter A, B, C or D)">
                     </div>
-                    <div class="questions-container" data-group-id="${
-                      group.id
-                    }"></div>
-                    <button type="button" class="btn btn-sm btn-outline-info add-question" 
-                        data-group-id="${group.id}" data-skill="${skill}">
-                        <i class="fa fa-plus"></i> Add Question
-                    </button>
+                    <div class="group-content-container">
+                        ${questionsContainerHtml}
+                    </div>
                 </div>
             </div>
         `;
@@ -861,6 +1027,164 @@ define([
       </button>`;
 
     return html;
+  }
+
+  /**
+   * Render table editor for TABLE_COMPLETION groups
+   */
+  function renderTableEditor(group) {
+    // Initialize tableData if not exists
+    if (!group.tableData) {
+      group.tableData = {
+        headers: ["Column 1", "Column 2"],
+        rows: [["", "[1]"]],
+        questions: [{ id: 1, correctAnswer: "" }],
+      };
+    }
+
+    const tableData = group.tableData;
+    const numCols = tableData.headers.length;
+    const numRows = tableData.rows.length;
+
+    let html = `
+      <div class="table-editor" data-group-id="${group.id}">
+        <div class="alert alert-info py-2 px-3 mb-2" style="font-size: 12px;">
+          <i class="fa fa-info-circle"></i> <strong>Table Completion:</strong> 
+          Use <code>[number]</code> syntax (e.g., <code>[1]</code>, <code>[2]</code>) in cells to create input fields.
+          Each <code>[number]</code> becomes an independent question.
+        </div>
+        
+        <div class="row mb-2">
+          <div class="col-auto">
+            <label class="small">Columns:</label>
+            <input type="number" class="form-control form-control-sm table-cols" 
+              value="${numCols}" min="2" max="10" style="width: 70px;">
+          </div>
+          <div class="col-auto">
+            <label class="small">Rows:</label>
+            <input type="number" class="form-control form-control-sm table-rows" 
+              value="${numRows}" min="1" max="20" style="width: 70px;">
+          </div>
+          <div class="col-auto d-flex align-items-end">
+            <button type="button" class="btn btn-sm btn-outline-primary update-table-size">
+              <i class="fa fa-refresh"></i> Update Size
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive mb-3">
+          <table class="table table-bordered table-sm table-editor-table">
+            <thead class="thead-light">
+              <tr>
+                ${tableData.headers
+                  .map(
+                    (header, idx) =>
+                      `<th><input type="text" class="form-control form-control-sm table-header-input" 
+                        data-col="${idx}" value="${escapeHtml(header)}" placeholder="Header ${idx + 1}"></th>`,
+                  )
+                  .join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableData.rows
+                .map(
+                  (row, rowIdx) =>
+                    `<tr data-row="${rowIdx}">
+                      ${row
+                        .map(
+                          (cell, colIdx) =>
+                            `<td><input type="text" class="form-control form-control-sm table-cell-input" 
+                              data-row="${rowIdx}" data-col="${colIdx}" value="${escapeHtml(cell)}" 
+                              placeholder="Cell or [number]"></td>`,
+                        )
+                        .join("")}
+                    </tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-questions-section">
+          <h6 class="mb-2"><i class="fa fa-key"></i> Question Answers</h6>
+          <div class="alert alert-secondary py-1 px-2 mb-2" style="font-size: 11px;">
+            Enter correct answers for each question number used in the table above.
+          </div>
+          <div class="table-questions-list">
+            ${renderTableQuestionsEditor(group)}
+          </div>
+        </div>
+      </div>`;
+
+    return html;
+  }
+
+  /**
+   * Render the questions/answers editor for table completion
+   */
+  function renderTableQuestionsEditor(group) {
+    if (!group.tableData || !group.tableData.questions) {
+      return '<p class="text-muted small">No questions defined yet.</p>';
+    }
+
+    let html = "";
+    group.tableData.questions.forEach((q) => {
+      html += `
+        <div class="input-group input-group-sm mb-1 table-question-item" data-question-id="${q.id}">
+          <div class="input-group-prepend">
+            <span class="input-group-text">[${q.id}]</span>
+          </div>
+          <input type="text" class="form-control table-question-answer" 
+            data-question-id="${q.id}" value="${escapeHtml(q.correctAnswer || "")}" 
+            placeholder="Correct answer for question ${q.id}">
+        </div>`;
+    });
+
+    return html;
+  }
+
+  /**
+   * Parse table cells to extract question IDs
+   */
+  function parseTableQuestionIds(tableData) {
+    const questionIds = new Set();
+    const regex = /\[(\d+)\]/g;
+
+    tableData.rows.forEach((row) => {
+      row.forEach((cell) => {
+        let match;
+        while ((match = regex.exec(cell)) !== null) {
+          questionIds.add(parseInt(match[1], 10));
+        }
+      });
+    });
+
+    return Array.from(questionIds).sort((a, b) => a - b);
+  }
+
+  /**
+   * Update table questions based on cell content
+   */
+  function updateTableQuestions(group) {
+    if (!group.tableData) return;
+
+    const questionIds = parseTableQuestionIds(group.tableData);
+    const existingAnswers = {};
+
+    // Preserve existing answers
+    if (group.tableData.questions) {
+      group.tableData.questions.forEach((q) => {
+        existingAnswers[q.id] = q.correctAnswer || "";
+      });
+    }
+
+    // Rebuild questions array
+    group.tableData.questions = questionIds.map((id) => ({
+      id: id,
+      correctAnswer: existingAnswers[id] || "",
+    }));
+
+    return group.tableData.questions;
   }
 
   /**
@@ -1416,6 +1740,26 @@ define([
   }
 
   /**
+   * Find a group by ID across all skills
+   */
+  function findGroupById(groupId) {
+    let found = null;
+
+    ["reading", "listening"].forEach(function (skill) {
+      if (examData[skill] && !found) {
+        examData[skill].forEach(function (parent) {
+          if (parent.groups && !found) {
+            const g = parent.groups.find((g) => g.id === groupId);
+            if (g) found = g;
+          }
+        });
+      }
+    });
+
+    return found;
+  }
+
+  /**
    * Update builder JSON from DOM
    */
   function updateBuilderJson() {
@@ -1537,56 +1881,106 @@ define([
     const groupEl = $(`.question-group[data-group-id="${group.id}"]`);
     group.title = groupEl.find(".group-title").val() || group.title;
     group.instruction = groupEl.find(".group-instruction").val() || "";
+    
+    // Get group type from DOM
+    const groupType = groupEl.find(".group-type-select").val() || groupEl.data("group-type") || "NORMAL";
+    group.groupType = groupType;
 
-    if (group.questions) {
-      group.questions.forEach(function (question) {
-        const questionEl = $(
-          `.question-item[data-question-id="${question.id}"]`,
-        );
-        question.number =
-          questionEl.find(".question-number").val() || question.number;
-        question.text = questionEl.find(".question-text").val() || "";
-        question.type =
-          questionEl.find(".question-type").val() || "MULTIPLE_CHOICE";
-        question.correctAnswer =
-          questionEl.find(".question-answer").val() || "";
+    // Handle TABLE_COMPLETION groups
+    if (groupType === "TABLE_COMPLETION") {
+      const tableEditor = groupEl.find(".table-editor");
+      if (tableEditor.length > 0) {
+        // Update headers
+        const headers = [];
+        tableEditor.find(".table-header-input").each(function () {
+          headers.push($(this).val());
+        });
 
-        // Update data based on question type
-        const type = question.type;
-
-        // Options for multiple choice types
-        if (
-          type === "MULTIPLE_CHOICE" ||
-          type === "MULTIPLE_CHOICE_MULTI" ||
-          type === "TRUE_FALSE" ||
-          type === "YES_NO"
-        ) {
-          question.options = [];
-          questionEl.find(".option-input").each(function () {
-            question.options.push($(this).val());
+        // Update rows
+        const rows = [];
+        const numCols = headers.length;
+        tableEditor.find("tbody tr").each(function () {
+          const row = [];
+          $(this).find(".table-cell-input").each(function () {
+            row.push($(this).val());
           });
-
-          // For multiple answer questions, also save numCorrect
-          if (type === "MULTIPLE_CHOICE_MULTI") {
-            question.numCorrect =
-              parseInt(questionEl.find(".num-correct").val()) || 2;
+          if (row.length > 0) {
+            rows.push(row);
           }
-        }
+        });
 
-        // Match items for matching types
-        if (
-          type === "MATCHING" ||
-          type === "MATCHING_HEADINGS" ||
-          type === "MATCHING_INFORMATION" ||
-          type === "MATCHING_FEATURES" ||
-          type === "MATCHING_SENTENCE_ENDINGS"
-        ) {
-          question.matchItems = [];
-          questionEl.find(".match-item-input").each(function () {
-            question.matchItems.push($(this).val());
-          });
-        }
-      });
+        // Update table questions
+        const questions = [];
+        tableEditor.find(".table-question-item").each(function () {
+          const qId = parseInt($(this).data("question-id"), 10);
+          const answer = $(this).find(".table-question-answer").val() || "";
+          questions.push({ id: qId, correctAnswer: answer });
+        });
+
+        group.tableData = {
+          headers: headers,
+          rows: rows,
+          questions: questions,
+        };
+
+        // Clear normal questions for table groups
+        group.questions = [];
+      }
+    } else {
+      // Normal group - update questions
+      if (group.questions) {
+        group.questions.forEach(function (question) {
+          const questionEl = $(
+            `.question-item[data-question-id="${question.id}"]`,
+          );
+          question.number =
+            questionEl.find(".question-number").val() || question.number;
+          question.text = questionEl.find(".question-text").val() || "";
+          question.type =
+            questionEl.find(".question-type").val() || "MULTIPLE_CHOICE";
+          question.correctAnswer =
+            questionEl.find(".question-answer").val() || "";
+
+          // Update data based on question type
+          const type = question.type;
+
+          // Options for multiple choice types
+          if (
+            type === "MULTIPLE_CHOICE" ||
+            type === "MULTIPLE_CHOICE_MULTI" ||
+            type === "TRUE_FALSE" ||
+            type === "YES_NO"
+          ) {
+            question.options = [];
+            questionEl.find(".option-input").each(function () {
+              question.options.push($(this).val());
+            });
+
+            // For multiple answer questions, also save numCorrect
+            if (type === "MULTIPLE_CHOICE_MULTI") {
+              question.numCorrect =
+                parseInt(questionEl.find(".num-correct").val()) || 2;
+            }
+          }
+
+          // Match items for matching types
+          if (
+            type === "MATCHING" ||
+            type === "MATCHING_HEADINGS" ||
+            type === "MATCHING_INFORMATION" ||
+            type === "MATCHING_FEATURES" ||
+            type === "MATCHING_SENTENCE_ENDINGS"
+          ) {
+            question.matchItems = [];
+            questionEl.find(".match-item-input").each(function () {
+              question.matchItems.push($(this).val());
+            });
+          }
+        });
+      }
+
+      // Clear tableData for normal groups
+      delete group.tableData;
     }
   }
 

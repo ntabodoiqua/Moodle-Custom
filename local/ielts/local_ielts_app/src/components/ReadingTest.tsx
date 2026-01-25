@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Empty } from "antd";
 import { useExamStore } from "../store/examStore";
 import QuestionRenderer from "./QuestionRenderer";
+import TableQuestion, { extractTableQuestionIds } from "./TableQuestion";
 import styles from "./ReadingTest.module.css";
 
 interface ReadingTestProps {
@@ -16,17 +17,24 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
   // Get reading passages from examData
   const passages = useMemo(() => examData?.reading || [], [examData]);
 
-  // Get questions for current passage
+  // Get questions for current passage (including table questions)
   const currentPassage = passages[currentPart];
   const currentQuestionIds = useMemo(() => {
     if (!currentPassage) return [];
     const ids: number[] = [];
     currentPassage.groups.forEach((group) => {
-      group.questions.forEach((q) => {
-        ids.push(q.id);
-      });
+      // Check if this is a table completion group
+      if (group.groupType === "TABLE_COMPLETION" && group.tableData) {
+        const tableQuestionIds = extractTableQuestionIds(group.tableData);
+        ids.push(...tableQuestionIds);
+      } else {
+        // Normal questions
+        group.questions.forEach((q) => {
+          ids.push(q.id);
+        });
+      }
     });
-    return ids;
+    return ids.sort((a, b) => a - b);
   }, [currentPassage]);
 
   // Reset currentPart when component mounts or examData changes
@@ -87,33 +95,45 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
             <div key={group.id} className={styles.questionSection}>
               <h3 className={styles.questionSectionTitle}>{group.title}</h3>
 
-              {group.instruction && (
+              {/* Render instruction only for non-table groups */}
+              {group.instruction && group.groupType !== "TABLE_COMPLETION" && (
                 <div className={styles.questionInstruction}>
                   {group.instruction}
                 </div>
               )}
 
-              {group.questions.map((question) => (
-                <div
-                  key={question.id}
-                  id={`question-${question.id}`}
-                  className={styles.question}
-                >
-                  <div className={styles.questionNumber}>{question.id}.</div>
-                  <div className={styles.questionContent}>
-                    <div
-                      className={styles.questionText}
-                      dangerouslySetInnerHTML={{ __html: question.text }}
-                    />
+              {/* Render TABLE_COMPLETION group */}
+              {group.groupType === "TABLE_COMPLETION" && group.tableData ? (
+                <TableQuestion
+                  tableData={group.tableData}
+                  answers={answers}
+                  onAnswerChange={onAnswerChange}
+                  questionIdPrefix="question-"
+                />
+              ) : (
+                /* Render normal questions */
+                group.questions.map((question) => (
+                  <div
+                    key={question.id}
+                    id={`question-${question.id}`}
+                    className={styles.question}
+                  >
+                    <div className={styles.questionNumber}>{question.id}.</div>
+                    <div className={styles.questionContent}>
+                      <div
+                        className={styles.questionText}
+                        dangerouslySetInnerHTML={{ __html: question.text }}
+                      />
 
-                    <QuestionRenderer
-                      question={question}
-                      answer={answers[question.id]}
-                      onAnswerChange={onAnswerChange}
-                    />
+                      <QuestionRenderer
+                        question={question}
+                        answer={answers[question.id]}
+                        onAnswerChange={onAnswerChange}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           ))}
         </div>
@@ -153,9 +173,16 @@ const ReadingTest = ({ answers, onAnswerChange }: ReadingTestProps) => {
           {passages.map((passage, index) => {
             if (index === currentPart) return null;
             const passageQuestionIds: number[] = [];
-            passage.groups.forEach((g) =>
-              g.questions.forEach((q) => passageQuestionIds.push(q.id)),
-            );
+            passage.groups.forEach((g) => {
+              // Handle TABLE_COMPLETION groups
+              if (g.groupType === "TABLE_COMPLETION" && g.tableData) {
+                const tableIds = extractTableQuestionIds(g.tableData);
+                passageQuestionIds.push(...tableIds);
+              } else {
+                // Normal questions
+                g.questions.forEach((q) => passageQuestionIds.push(q.id));
+              }
+            });
             const answered = passageQuestionIds.filter(
               (id) => answers[id],
             ).length;
