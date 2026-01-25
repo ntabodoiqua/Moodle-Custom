@@ -45,6 +45,10 @@ const ResultPage = ({ config }: ResultPageProps) => {
     reviewBand,
   } = useExamStore();
 
+  // Get review attempt data from config if in review mode
+  const reviewAttemptData =
+    isReviewMode && config?.attemptData ? config.attemptData : null;
+
   // Format time taken for display
   const formatTimeTaken = (seconds: number | null): string => {
     if (seconds === null) return "N/A";
@@ -963,16 +967,33 @@ const ResultPage = ({ config }: ResultPageProps) => {
         return (
           <div>
             {[1, 2, 3].map((partId) => {
-              const audioBlob = speakingAudio[partId];
-              const audioUrl = audioBlob
-                ? URL.createObjectURL(audioBlob)
-                : null;
+              // In review mode, check if we have audio URLs from server
+              let audioUrl: string | null = null;
+              let hasRecording = false;
+
+              if (isReviewMode && reviewAttemptData) {
+                // Try to get audio URL from review attempt data
+                if (
+                  reviewAttemptData.speakingAudio &&
+                  reviewAttemptData.speakingAudio[partId]
+                ) {
+                  audioUrl = reviewAttemptData.speakingAudio[partId];
+                  hasRecording = true;
+                }
+              } else {
+                // Normal mode: use local audio blobs
+                const audioBlob = speakingAudio[partId];
+                if (audioBlob) {
+                  audioUrl = URL.createObjectURL(audioBlob);
+                  hasRecording = true;
+                }
+              }
 
               return (
                 <div key={partId} className={styles.speakingReview}>
                   <div className={styles.speakingPart}>
                     Speaking Part {partId}
-                    {audioBlob && (
+                    {hasRecording && (
                       <CheckCircleOutlined
                         style={{ color: "#16a34a", marginLeft: 8 }}
                       />

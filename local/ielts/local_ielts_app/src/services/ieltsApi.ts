@@ -150,6 +150,7 @@ export interface DetailedResults {
     isCorrect: boolean;
   }>;
   writingEssays?: Record<number, string>;
+  speakingAudio?: Record<number, string>; // URLs to uploaded audio files
 }
 
 export const submitExamResult = async (
@@ -175,6 +176,66 @@ export const submitExamResult = async (
   }
 
   return response.data.attempt_id;
+};
+
+/**
+ * Upload audio file for speaking section
+ *
+ * @param examId - The exam ID
+ * @param partId - Speaking part ID (1, 2, or 3)
+ * @param audioBlob - Audio file as Blob
+ * @returns File URL on success, null on failure
+ */
+export const uploadAudioFile = async (
+  examId: number,
+  partId: number,
+  audioBlob: Blob,
+): Promise<string | null> => {
+  const config = getConfig();
+
+  // Create FormData for file upload
+  const formData = new FormData();
+  formData.append("action", "uploadaudio");
+  formData.append("sesskey", config.sesskey);
+  formData.append("exam_id", examId.toString());
+  formData.append("part_id", partId.toString());
+
+  // Add audio file with proper filename and type
+  const filename = `speaking_part${partId}.webm`;
+  formData.append("audio", audioBlob, filename);
+
+  try {
+    const response = await axios.post<
+      ApiResponse<{
+        file_url: string;
+        filename: string;
+        filesize: number;
+        message: string;
+      }>
+    >(config.apiEndpoint, formData, {
+      headers: {
+        // Let browser set Content-Type with boundary for FormData
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (response.data.success && response.data.data) {
+      return response.data.data.file_url;
+    } else {
+      console.error("Failed to upload audio:", response.data.error);
+      return null;
+    }
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiResponse>;
+
+    console.error(`Audio upload failed for part ${partId}:`, error);
+
+    if (axiosError.response?.data?.error) {
+      console.error("Server error:", axiosError.response.data.error);
+    }
+
+    return null;
+  }
 };
 
 // Export types for external use

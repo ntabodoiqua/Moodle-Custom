@@ -581,3 +581,69 @@ function ielts_reset_userdata($data) {
 
     return $status;
 }
+
+// ============================================================
+// FILE SERVING
+// ============================================================
+
+/**
+ * Serve the files from the IELTS file areas.
+ *
+ * @param stdClass $course The course object
+ * @param stdClass $cm The course module object
+ * @param stdClass $context The context object
+ * @param string $filearea The name of the file area
+ * @param array $args Extra arguments (itemid, path)
+ * @param bool $forcedownload Whether or not force download
+ * @param array $options Additional options affecting the file serving
+ * @return bool false if the file not found, just send the file otherwise and do not return anything
+ */
+function mod_ielts_pluginfile($course, $cm, $context, $filearea, array $args, $forcedownload, array $options = array()) {
+    global $CFG, $DB, $USER;
+
+    if ($context->contextlevel != CONTEXT_MODULE) {
+        return false;
+    }
+
+    require_login($course, true, $cm);
+
+    // Check capability to view the module.
+    require_capability('mod/ielts:view', $context);
+
+    if ($filearea !== 'speaking_audio') {
+        return false;
+    }
+
+    $itemid = array_shift($args);
+    $filename = array_pop($args);
+    $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
+
+    // Get the file.
+    $fs = get_file_storage();
+    $file = $fs->get_file($context->id, 'mod_ielts', $filearea, $itemid, $filepath, $filename);
+
+    if (!$file) {
+        return false;
+    }
+
+    // For speaking audio, verify the user can access this file.
+    // Users can only access their own audio files, or teachers can access all.
+    $can_access = false;
+
+    // Check if user owns this file.
+    if ($file->get_userid() == $USER->id) {
+        $can_access = true;
+    }
+
+    // Check if user has grading capability (teachers).
+    if (has_capability('mod/ielts:grade', $context)) {
+        $can_access = true;
+    }
+
+    if (!$can_access) {
+        return false;
+    }
+
+    // Send the file.
+    send_stored_file($file, 86400, 0, $forcedownload, $options);
+}

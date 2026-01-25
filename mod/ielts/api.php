@@ -316,6 +316,143 @@ try {
             break;
 
         // ============================================================
+        // UPLOAD AUDIO FILE
+        // ============================================================
+        case 'uploadaudio':
+            $ieltsid = required_param('exam_id', PARAM_INT);
+            $partid = required_param('part_id', PARAM_INT);
+
+            // Verify access to exam.
+            $ielts = verify_ielts_access($ieltsid);
+
+            // Check submit capability (need this to upload audio).
+            $cm = get_coursemodule_from_instance('ielts', $ielts->id, $ielts->course, false, MUST_EXIST);
+            $context = context_module::instance($cm->id);
+            require_capability('mod/ielts:submit', $context);
+
+            // Validate part ID (should be 1, 2, or 3 for speaking parts).
+            if (!in_array($partid, [1, 2, 3])) {
+                send_error_response('Invalid part ID. Must be 1, 2, or 3.');
+            }
+
+            // Check if file was uploaded.
+            if (!isset($_FILES['audio']) || $_FILES['audio']['error'] !== UPLOAD_ERR_OK) {
+                $error_message = 'No audio file uploaded';
+                if (isset($_FILES['audio']['error'])) {
+                    switch ($_FILES['audio']['error']) {
+                        case UPLOAD_ERR_INI_SIZE:
+                        case UPLOAD_ERR_FORM_SIZE:
+                            $error_message = 'Audio file is too large';
+                            break;
+                        case UPLOAD_ERR_PARTIAL:
+                            $error_message = 'Audio file upload was interrupted';
+                            break;
+                        case UPLOAD_ERR_NO_TMP_DIR:
+                        case UPLOAD_ERR_CANT_WRITE:
+                            $error_message = 'Server error during file upload';
+                            break;
+                    }
+                }
+                send_error_response($error_message);
+            }
+
+            $file = $_FILES['audio'];
+            
+            // Validate file type.
+            $allowed_types = ['audio/webm', 'audio/ogg', 'audio/mp3', 'audio/mp4', 'audio/wav'];
+            $file_type = $file['type'];
+            
+            if (!in_array($file_type, $allowed_types)) {
+                send_error_response('Invalid audio file type. Allowed types: webm, ogg, mp3, mp4, wav');
+            }
+
+            // Validate file size (max 50MB).
+            $max_size = 50 * 1024 * 1024; // 50MB
+            if ($file['size'] > $max_size) {
+                send_error_response('Audio file is too large. Maximum size is 50MB.');
+            }
+
+            try {
+                // Get file storage.
+                $fs = get_file_storage();
+
+                // Determine file extension from mime type.
+                $extension_map = [
+                    'audio/webm' => 'webm',
+                    'audio/ogg' => 'ogg', 
+                    'audio/mp3' => 'mp3',
+                    'audio/mpeg' => 'mp3',
+                    'audio/mp4' => 'mp4',
+                    'audio/wav' => 'wav'
+                ];
+                
+                $extension = $extension_map[$file_type] ?? 'webm';
+                
+                // Create unique filename.
+                $filename = "speaking_part{$partid}_" . $USER->id . '_' . time() . '.' . $extension;
+                
+                // File record for Moodle file storage.
+                $filerecord = [
+                    'contextid' => $context->id,
+                    'component' => 'mod_ielts',
+                    'filearea' => 'speaking_audio',
+                    'itemid' => $ielts->id,
+                    'filepath' => '/',
+                    'filename' => $filename,
+                    'userid' => $USER->id
+                ];
+
+                // Delete any existing audio file for this user and part.
+                $existing_files = $fs->get_area_files(
+                    $context->id, 
+                    'mod_ielts', 
+                    'speaking_audio', 
+                    $ielts->id, 
+                    'filename', 
+                    false
+                );
+                
+                foreach ($existing_files as $existing_file) {
+                    $existing_filename = $existing_file->get_filename();
+                    if (preg_match("/speaking_part{$partid}_{$USER->id}_/", $existing_filename)) {
+                        $existing_file->delete();
+                    }
+                }
+
+                // Store the uploaded file.
+                $stored_file = $fs->create_file_from_pathname($filerecord, $file['tmp_name']);
+
+                if (!$stored_file) {
+                    send_error_response('Failed to save audio file');
+                }
+
+                // Generate URL for the uploaded file.
+                $file_url = moodle_url::make_pluginfile_url(
+                    $context->id,
+                    'mod_ielts',
+                    'speaking_audio', 
+                    $ielts->id,
+                    '/',
+                    $filename
+                );
+
+                send_json_response([
+                    'success' => true,
+                    'data' => [
+                        'file_url' => $file_url->out(),
+                        'filename' => $filename,
+                        'filesize' => $stored_file->get_filesize(),
+                        'message' => "Audio for Part {$partid} uploaded successfully"
+                    ]
+                ]);
+
+            } catch (Exception $e) {
+                error_log("Audio upload error: " . $e->getMessage());
+                send_error_response('Failed to upload audio file: ' . $e->getMessage());
+            }
+            break;
+
+        // ============================================================
         // UNKNOWN ACTION
         // ============================================================
         default:

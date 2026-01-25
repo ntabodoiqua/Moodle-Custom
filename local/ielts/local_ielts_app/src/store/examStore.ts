@@ -12,6 +12,7 @@ import {
   fetchExamById,
   submitExamResult,
   initializeApi,
+  uploadAudioFile,
   type DetailedResults,
 } from "../services/ieltsApi";
 
@@ -246,6 +247,29 @@ export const useExamStore = create<ExamState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
+      // First, upload any audio files
+      const speakingAudioUrls: Record<number, string> = {};
+      if (Object.keys(speakingAudio).length > 0) {
+        console.log("Uploading audio files...");
+
+        for (const [partId, audioBlob] of Object.entries(speakingAudio)) {
+          const partIdNum = parseInt(partId);
+          const fileUrl = await uploadAudioFile(
+            currentExamId,
+            partIdNum,
+            audioBlob,
+          );
+
+          if (fileUrl) {
+            speakingAudioUrls[partIdNum] = fileUrl;
+            console.log(`Audio uploaded for part ${partIdNum}:`, fileUrl);
+          } else {
+            console.error(`Failed to upload audio for part ${partIdNum}`);
+            // Continue with submission even if some audio files fail to upload
+          }
+        }
+      }
+
       // Calculate detailed scoring with question-level results
       const { band, detailedResults } = calculateDetailedScore(
         answers,
@@ -253,6 +277,11 @@ export const useExamStore = create<ExamState>((set, get) => ({
         writingEssays,
         speakingAudio,
       );
+
+      // Add audio URLs to detailed results
+      if (Object.keys(speakingAudioUrls).length > 0) {
+        detailedResults.speakingAudio = speakingAudioUrls;
+      }
 
       const attemptId = await submitExamResult(
         currentExamId,
@@ -296,6 +325,9 @@ export const useExamStore = create<ExamState>((set, get) => ({
         reviewQuestionResults: attemptData.questionResults || null,
         answers: attemptData.answers || {},
         writingEssays: attemptData.writingEssays || {},
+        // Note: attemptData.speakingAudio contains URLs, not Blobs
+        // We'll need to handle this differently in ResultPage
+        speakingAudio: {}, // Clear local blobs since we have URLs in attemptData
         timeTaken: attemptData.timeTaken || null,
         gradingInfo: attemptData.grading || null,
         // Reset other states
@@ -486,9 +518,8 @@ function calculateDetailedScore(
   const average = (readingBand + listeningBand) / 2;
   const band = Math.round(average * 2) / 2;
 
-  // Note: speakingAudio Blobs need to be uploaded separately to server
-  // For now, we'll mark speaking as submitted but not store the audio in JSON
-  // The audio should be uploaded via a separate API endpoint for file storage
+  // Note: speakingAudio Blobs are uploaded separately to server via uploadAudioFile()
+  // The URLs to uploaded files will be added to detailedResults.speakingAudio before submission
 
   const detailedResults: DetailedResults = {
     answers,
@@ -508,7 +539,7 @@ function calculateDetailedScore(
     },
     questionResults,
     writingEssays: writingEssays || {},
-    // speakingAudio: audio files should be uploaded separately
+    // speakingAudio URLs will be added by submitAssessment() after upload
   };
 
   return { band, detailedResults };
