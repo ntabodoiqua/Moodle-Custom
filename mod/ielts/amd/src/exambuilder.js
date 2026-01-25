@@ -248,9 +248,11 @@ define([
    * Bind form submission to generate JSON
    */
   function bindFormSubmission() {
-    $("form.mform").on("submit", function () {
+    $("form.mform").on("submit", function (e) {
       if ($("#id_inputmethod").val() === "builder") {
         updateBuilderJson();
+        // Log để debug
+        console.log("Form submit - builder_json:", $("#id_builder_json").val());
       }
     });
 
@@ -278,6 +280,30 @@ define([
 
           // Update ID counters based on existing data
           updateIdCounters(data);
+
+          // Set duration values from data (convert seconds to minutes)
+          if (data.durations) {
+            if (data.durations.reading) {
+              $("#id_duration_reading").val(
+                Math.floor(data.durations.reading / 60),
+              );
+            }
+            if (data.durations.listening) {
+              $("#id_duration_listening").val(
+                Math.floor(data.durations.listening / 60),
+              );
+            }
+            if (data.durations.writing) {
+              $("#id_duration_writing").val(
+                Math.floor(data.durations.writing / 60),
+              );
+            }
+            if (data.durations.speaking) {
+              $("#id_duration_speaking").val(
+                Math.floor(data.durations.speaking / 60),
+              );
+            }
+          }
 
           // Render existing content
           renderExistingContent();
@@ -1489,6 +1515,14 @@ define([
     // Store JSON
     const jsonString = JSON.stringify(examData, null, 2);
     $("#id_builder_json").val(jsonString);
+
+    // Debug log
+    console.log("updateBuilderJson - examData:", examData);
+    console.log("updateBuilderJson - jsonString length:", jsonString.length);
+    console.log(
+      "updateBuilderJson - builder_json field exists:",
+      $("#id_builder_json").length > 0,
+    );
 
     // Also update content_json for preview
     if ($("#id_inputmethod").val() === "builder") {

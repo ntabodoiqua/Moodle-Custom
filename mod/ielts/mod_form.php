@@ -209,7 +209,7 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->addHelpButton('content_json', 'content_json', 'mod_ielts');
 
         // Hidden field to store final JSON from builder.
-        $mform->addElement('hidden', 'builder_json', '');
+        $mform->addElement('hidden', 'builder_json', '', ['id' => 'id_builder_json']);
         $mform->setType('builder_json', PARAM_RAW);
 
         // -------------------------------------------------------
