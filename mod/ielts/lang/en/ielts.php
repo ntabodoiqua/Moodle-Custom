@@ -195,6 +195,47 @@ $string['eventattemptsubmitted'] = 'IELTS attempt submitted';
 $string['eventcoursemoduleviewed'] = 'IELTS activity viewed';
 
 // ==========================================================
+// MANUAL GRADING STRINGS
+// ==========================================================
+
+// Grading page.
+$string['grading'] = 'Grading';
+$string['manualgrading'] = 'Manual Grading';
+$string['backtooverview'] = 'Back to Overview';
+$string['backtolist'] = 'Back to List';
+$string['nomanualgradingrequired'] = 'This exam does not have Writing or Speaking sections that require manual grading.';
+$string['noattemptstograge'] = 'There are no completed attempts to grade.';
+$string['totalsubmissions'] = 'Total Submissions';
+$string['needsgrading'] = 'Needs Grading';
+$string['fullygraded'] = 'Fully Graded';
+$string['allsubmissions'] = 'All Submissions';
+$string['pendinggrading'] = 'Pending Grading';
+$string['alreadygraded'] = 'Already Graded';
+$string['student'] = 'Student';
+$string['submitted'] = 'Submitted';
+$string['writing'] = 'Writing';
+$string['speaking'] = 'Speaking';
+$string['pending'] = 'Pending';
+$string['graded'] = 'Graded';
+$string['gradeattempt'] = 'Grade Attempt';
+$string['studentinfo'] = 'Student Information';
+$string['prompt'] = 'Prompt';
+$string['studentresponse'] = 'Student Response';
+$string['words'] = 'words';
+$string['noresponse'] = 'No response submitted.';
+$string['writingband'] = 'Writing Band Score';
+$string['speakingband'] = 'Speaking Band Score';
+$string['selectband'] = '-- Select Band --';
+$string['feedback'] = 'Feedback';
+$string['feedbackplaceholder'] = 'Enter feedback for the student (optional)...';
+$string['questions'] = 'Questions';
+$string['recording'] = 'Recording';
+$string['norecordings'] = 'No audio recordings were submitted for this speaking section.';
+$string['norecordingforpart'] = 'No recording for this part.';
+$string['savegrade'] = 'Save Grade';
+$string['gradingsaved'] = 'Grade saved successfully.';
+$string['gradinglink'] = 'Grade Submissions';
+// ==========================================================
 // EXAM BUILDER STRINGS
 // ==========================================================
 

@@ -64,7 +64,7 @@ const getConfig = (): MoodleConfig => {
  */
 export const callApi = async <T = unknown>(
   action: string,
-  params: Record<string, string | number | boolean> = {}
+  params: Record<string, string | number | boolean> = {},
 ): Promise<ApiResponse<T>> => {
   const config = getConfig();
 
@@ -87,7 +87,7 @@ export const callApi = async <T = unknown>(
           // Let browser set Content-Type with boundary for FormData
           "Content-Type": "multipart/form-data",
         },
-      }
+      },
     );
 
     return response.data;
@@ -132,15 +132,35 @@ export const fetchExamById = async (id: number): Promise<ExamData | null> => {
  * @param examId - The exam ID
  * @param answers - User answers object
  * @param band - Calculated band score (0-9)
+ * @param detailedResults - Optional detailed scoring info
  * @returns Attempt ID on success, null on failure
  */
+export interface DetailedResults {
+  answers: UserAnswers;
+  scoring?: {
+    reading?: { correct: number; total: number; band: number };
+    listening?: { correct: number; total: number; band: number };
+    writing?: { submitted: boolean };
+    speaking?: { submitted: boolean };
+  };
+  questionResults?: Array<{
+    id: number;
+    userAnswer: string;
+    correctAnswer: string;
+    isCorrect: boolean;
+  }>;
+}
+
 export const submitExamResult = async (
   examId: number,
   answers: UserAnswers,
-  band: number
+  band: number,
+  detailedResults?: DetailedResults,
 ): Promise<number | null> => {
-  // Stringify answers for transmission
-  const resultsJson = JSON.stringify(answers);
+  // If detailed results provided, use that; otherwise just answers
+  const resultsJson = detailedResults
+    ? JSON.stringify(detailedResults)
+    : JSON.stringify({ answers });
 
   const response = await callApi<SubmitAttemptResponse>("submitattempt", {
     exam_id: examId,

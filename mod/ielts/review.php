@@ -59,6 +59,40 @@ if ($attempt->userid != $USER->id && !has_capability('mod/ielts:grade', $context
 }
 
 // Prepare Moodle configuration for React app with review mode.
+// Parse score_data - can be either old format (just answers) or new format (detailed results)
+$scoredata = json_decode($attempt->score_data, true) ?: [];
+$answersdata = [];
+$scoringdata = null;
+$questionresults = null;
+$writingessays = null;
+$speakingaudio = null;
+
+// Check if new detailed format
+if (isset($scoredata['answers'])) {
+    // New detailed format
+    $answersdata = $scoredata['answers'];
+    $scoringdata = $scoredata['scoring'] ?? null;
+    $questionresults = $scoredata['questionResults'] ?? null;
+    $writingessays = $scoredata['writingEssays'] ?? null;
+    $speakingaudio = $scoredata['speakingAudio'] ?? null;
+} else {
+    // Old format - score_data is just the answers object
+    $answersdata = $scoredata;
+}
+
+// Build grading info if teacher has graded Writing/Speaking
+$gradinginfo = null;
+if (property_exists($attempt, 'writing_band') || property_exists($attempt, 'speaking_band')) {
+    $gradinginfo = [
+        'writing_band' => isset($attempt->writing_band) && $attempt->writing_band !== null ? (float) $attempt->writing_band : null,
+        'speaking_band' => isset($attempt->speaking_band) && $attempt->speaking_band !== null ? (float) $attempt->speaking_band : null,
+        'writing_feedback' => $attempt->writing_feedback ?? null,
+        'speaking_feedback' => $attempt->speaking_feedback ?? null,
+        'graded_by' => !empty($attempt->graded_by) ? (int) $attempt->graded_by : null,
+        'timegraded' => !empty($attempt->timegraded) ? (int) $attempt->timegraded : null,
+    ];
+}
+
 $moodleconfig = [
     'userId' => $USER->id,
     'sesskey' => sesskey(),
@@ -75,7 +109,12 @@ $moodleconfig = [
         'band' => (float) $attempt->final_band,
         'timecreated' => (int) $attempt->timecreated,
         'timefinished' => (int) $attempt->timefinished,
-        'answers' => json_decode($attempt->score_data, true) ?: [],
+        'answers' => $answersdata,
+        'scoring' => $scoringdata,
+        'questionResults' => $questionresults,
+        'writingEssays' => $writingessays,
+        'speakingAudio' => $speakingaudio,
+        'grading' => $gradinginfo,
     ],
     'backUrl' => (new moodle_url('/mod/ielts/view.php', ['id' => $cm->id]))->out(false),
 ];

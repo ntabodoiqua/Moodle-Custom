@@ -100,11 +100,12 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
           config.attemptId,
         );
 
-        // Load exam data first (needed for displaying questions in ResultPage)
-        await loadExam(examId);
-
-        // Then set review mode with attempt data
+        // Set review mode FIRST to load answers
         setReviewMode(true, config.attemptData);
+
+        // Load exam data (with preserveAnswers=true to keep the review answers)
+        await loadExam(examId, true);
+
         setLoading(false);
 
         // Navigate to result page

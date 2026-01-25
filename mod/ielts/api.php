@@ -285,6 +285,19 @@ try {
             // Decode score_data.
             $scoredata = json_decode($attempt->score_data, true);
 
+            // Build grading info (teacher-graded scores).
+            $gradinginfo = null;
+            if ($attempt->writing_band !== null || $attempt->speaking_band !== null) {
+                $gradinginfo = [
+                    'writing_band' => $attempt->writing_band !== null ? (float) $attempt->writing_band : null,
+                    'speaking_band' => $attempt->speaking_band !== null ? (float) $attempt->speaking_band : null,
+                    'writing_feedback' => $attempt->writing_feedback ?? null,
+                    'speaking_feedback' => $attempt->speaking_feedback ?? null,
+                    'graded_by' => $attempt->graded_by ? (int) $attempt->graded_by : null,
+                    'timegraded' => $attempt->timegraded ? (int) $attempt->timegraded : null,
+                ];
+            }
+
             send_json_response([
                 'success' => true,
                 'data' => [
@@ -293,6 +306,9 @@ try {
                     'exam_name' => $ielts->name,
                     'score_data' => $scoredata,
                     'final_band' => (float) $attempt->final_band,
+                    'reading_band' => $attempt->reading_band !== null ? (float) $attempt->reading_band : null,
+                    'listening_band' => $attempt->listening_band !== null ? (float) $attempt->listening_band : null,
+                    'grading' => $gradinginfo,
                     'timecreated' => (int) $attempt->timecreated,
                     'timefinished' => $attempt->timefinished ? (int) $attempt->timefinished : null,
                 ],

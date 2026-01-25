@@ -375,8 +375,16 @@ define([
           const cellValue = input.val();
           const hasQuestionPattern = /\[\d+\]/.test(cellValue);
 
-          // Always update validation messages
-          const validation = validateTableQuestionNumbers(group.tableData);
+          // Get expected start number from data attribute or recalculate
+          const expectedStart =
+            tableEditor.data("expected-start") ||
+            getExpectedStartNumberForGroup(groupId);
+
+          // Always update validation messages with expected start number
+          const validation = validateTableQuestionNumbers(
+            group.tableData,
+            expectedStart,
+          );
           const validationContainer = tableEditor.find(
             ".table-validation-messages",
           );
@@ -608,6 +616,49 @@ define([
     });
 
     return count;
+  }
+
+  /**
+   * Calculate the expected starting question number for a specific group
+   * by counting all questions that come before it in the skill
+   */
+  function getExpectedStartNumberForGroup(groupId) {
+    // Find which skill this group belongs to
+    const skill = findSkillForGroup(groupId);
+    if (!skill) return 1;
+
+    const data = examData[skill];
+    if (!data) return 1;
+
+    let questionNum = 1;
+    let found = false;
+
+    // Iterate through all parents and groups until we find the target group
+    for (const parent of data) {
+      if (!parent.groups || found) continue;
+
+      for (const group of parent.groups) {
+        if (group.id === groupId) {
+          found = true;
+          break;
+        }
+
+        // Count questions in groups before the target
+        if (
+          group.groupType === "TABLE_COMPLETION" &&
+          group.tableData &&
+          group.tableData.questions
+        ) {
+          questionNum += group.tableData.questions.length;
+        } else if (group.questions) {
+          questionNum += group.questions.length;
+        }
+      }
+
+      if (found) break;
+    }
+
+    return questionNum;
   }
 
   /**
@@ -1266,13 +1317,18 @@ define([
    * Render table editor for TABLE_COMPLETION groups
    */
   function renderTableEditor(group) {
+    // Calculate expected starting number for this group
+    const expectedStartNumber = getExpectedStartNumberForGroup(group.id);
+
     // Initialize tableData if not exists
     if (!group.tableData) {
       const newQuestionId = idCounters.question++;
       group.tableData = {
         headers: ["Column 1", "Column 2"],
-        rows: [["", "[1]"]],
-        questions: [{ id: newQuestionId, number: 1, correctAnswer: "" }],
+        rows: [["", `[${expectedStartNumber}]`]],
+        questions: [
+          { id: newQuestionId, number: expectedStartNumber, correctAnswer: "" },
+        ],
       };
     }
 
@@ -1280,16 +1336,21 @@ define([
     const numCols = tableData.headers.length;
     const numRows = tableData.rows.length;
 
-    // Validate question numbers
-    const validation = validateTableQuestionNumbers(tableData);
+    // Validate question numbers with expected start
+    const validation = validateTableQuestionNumbers(
+      tableData,
+      expectedStartNumber,
+    );
 
     let html = `
-      <div class="table-editor" data-group-id="${group.id}">
+      <div class="table-editor" data-group-id="${group.id}" data-expected-start="${expectedStartNumber}">
         <div class="alert alert-info py-2 px-3 mb-2" style="font-size: 12px;">
           <i class="fa fa-info-circle"></i> <strong>Table Completion:</strong> 
-          Use <code>[number]</code> syntax (e.g., <code>[1]</code>, <code>[2]</code>) in cells to create input fields.
-          Each <code>[number]</code> becomes an independent question.
-          <br><small class="text-muted">Numbers must be sequential (e.g., [1], [2], [3]). No duplicates or gaps allowed.</small>
+          Use <code>[number]</code> syntax in cells to create input fields.
+          <br><small class="text-muted">
+            <strong>Expected sequence:</strong> Start from <code>[${expectedStartNumber}]</code> and continue sequentially.
+            ${expectedStartNumber > 1 ? `(Previous questions: 1-${expectedStartNumber - 1})` : ""}
+          </small>
         </div>
         
         <div class="row mb-2">
@@ -1430,20 +1491,26 @@ define([
   /**
    * Validate table question numbers - check for sequential numbering
    * Returns object with isValid, errors array, and suggestions
+   * @param tableData - The table data containing rows with [n] markers
+   * @param expectedStartNumber - The expected starting number (based on previous questions in skill)
    */
-  function validateTableQuestionNumbers(tableData) {
+  function validateTableQuestionNumbers(tableData, expectedStartNumber) {
     const questionNumbers = parseTableQuestionNumbers(tableData);
     const errors = [];
     const warnings = [];
+
+    // Default to 1 if not provided
+    const startFrom = expectedStartNumber || 1;
 
     if (questionNumbers.length === 0) {
       return {
         isValid: true,
         errors: [],
         warnings: [
-          "No question markers found. Use [1], [2], etc. to create questions.",
+          `No question markers found. Use [${startFrom}], [${startFrom + 1}], etc. to create questions.`,
         ],
         questionNumbers: [],
+        expectedStartNumber: startFrom,
       };
     }
 
@@ -1490,19 +1557,30 @@ define([
       errors.push(`Missing question numbers: [${missingNumbers.join("], [")}]`);
     }
 
-    // Warning if not starting from 1 (might be intentional for multi-section)
-    if (minNum !== 1) {
-      warnings.push(
-        `Questions start from [${minNum}] instead of [1]. This is OK if continuing from previous section.`,
-      );
+    // Check if starting from the expected number
+    if (minNum !== startFrom) {
+      if (minNum < startFrom) {
+        errors.push(
+          `Questions should start from [${startFrom}] (based on previous questions), but found [${minNum}].`,
+        );
+      } else if (minNum > startFrom) {
+        // Gap from previous questions
+        const missingBefore = [];
+        for (let i = startFrom; i < minNum; i++) {
+          missingBefore.push(i);
+        }
+        errors.push(
+          `Gap detected: Questions should start from [${startFrom}], but start from [${minNum}]. Missing: [${missingBefore.join("], [")}]`,
+        );
+      }
     }
 
     // Suggestion for correct format
     let suggestion = "";
     if (errors.length > 0) {
       const correctedSequence = [];
-      for (let i = 1; i <= questionNumbers.length; i++) {
-        correctedSequence.push(`[${i}]`);
+      for (let i = 0; i < questionNumbers.length; i++) {
+        correctedSequence.push(`[${startFrom + i}]`);
       }
       suggestion = `Suggested sequence: ${correctedSequence.join(", ")}`;
     }
@@ -1513,6 +1591,7 @@ define([
       warnings,
       questionNumbers,
       suggestion,
+      expectedStartNumber: startFrom,
     };
   }
 

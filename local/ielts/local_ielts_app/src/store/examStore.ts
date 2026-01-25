@@ -12,7 +12,18 @@ import {
   fetchExamById,
   submitExamResult,
   initializeApi,
+  type DetailedResults,
 } from "../services/ieltsApi";
+
+// Grading info from teacher
+interface GradingInfo {
+  writing_band: number | null;
+  speaking_band: number | null;
+  writing_feedback: string | null;
+  speaking_feedback: string | null;
+  graded_by: number | null;
+  timegraded: number | null;
+}
 
 interface AttemptData {
   band: number;
@@ -21,6 +32,7 @@ interface AttemptData {
   speakingAudio?: Record<number, string>; // URLs instead of Blobs for review
   timeTaken?: number;
   completedAt?: string;
+  grading?: GradingInfo | null; // Teacher graded scores
 }
 
 interface ExamState {
@@ -64,11 +76,14 @@ interface ExamState {
 
   // New async actions
   initApi: (config: MoodleConfig) => void;
-  loadExam: (id: number) => Promise<void>;
+  loadExam: (id: number, preserveAnswers?: boolean) => Promise<void>;
   submitAssessment: () => Promise<number | null>;
 
   // Review mode action
   setReviewMode: (isReview: boolean, attemptData?: AttemptData) => void;
+
+  // Grading info getter
+  gradingInfo: GradingInfo | null;
 }
 
 export const useExamStore = create<ExamState>((set, get) => ({
@@ -86,6 +101,7 @@ export const useExamStore = create<ExamState>((set, get) => ({
   // Review mode
   isReviewMode: false,
   reviewBand: null,
+  gradingInfo: null,
 
   answers: {},
   writingEssays: {},
@@ -154,7 +170,7 @@ export const useExamStore = create<ExamState>((set, get) => ({
   },
 
   // Load exam data from API
-  loadExam: async (id: number) => {
+  loadExam: async (id: number, preserveAnswers: boolean = false) => {
     set({ isLoading: true, error: null });
 
     try {
@@ -162,15 +178,16 @@ export const useExamStore = create<ExamState>((set, get) => ({
 
       if (examData) {
         const currentState = get();
-        // Only reset answers/submission if loading a different exam
+        // Only reset answers/submission if loading a different exam AND not preserving answers
         const isNewExam = currentState.currentExamId !== id;
+        const shouldResetAnswers = isNewExam && !preserveAnswers;
         set({
           examData,
           currentExamId: id,
           isLoading: false,
           error: null,
-          // Only reset answers when loading a NEW exam (not when re-loading same exam)
-          ...(isNewExam
+          // Only reset answers when loading a NEW exam and not in review mode
+          ...(shouldResetAnswers
             ? {
                 answers: {},
                 writingEssays: {},
@@ -197,7 +214,8 @@ export const useExamStore = create<ExamState>((set, get) => ({
 
   // Submit assessment to API
   submitAssessment: async () => {
-    const { currentExamId, answers, examData } = get();
+    const { currentExamId, answers, examData, writingEssays, speakingAudio } =
+      get();
 
     if (!currentExamId) {
       console.error("No exam loaded");
@@ -212,10 +230,20 @@ export const useExamStore = create<ExamState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // Calculate band score (mock logic - replace with actual calculation)
-      const band = calculateBandScore(answers, examData);
+      // Calculate detailed scoring with question-level results
+      const { band, detailedResults } = calculateDetailedScore(
+        answers,
+        examData,
+        writingEssays,
+        speakingAudio,
+      );
 
-      const attemptId = await submitExamResult(currentExamId, answers, band);
+      const attemptId = await submitExamResult(
+        currentExamId,
+        answers,
+        band,
+        detailedResults,
+      );
 
       if (attemptId) {
         set({
@@ -251,6 +279,7 @@ export const useExamStore = create<ExamState>((set, get) => ({
         answers: attemptData.answers || {},
         writingEssays: attemptData.writingEssays || {},
         timeTaken: attemptData.timeTaken || null,
+        gradingInfo: attemptData.grading || null,
         // Reset other states
         timeLeft: 0,
         endTime: null,
@@ -261,6 +290,7 @@ export const useExamStore = create<ExamState>((set, get) => ({
       set({
         isReviewMode: false,
         reviewBand: null,
+        gradingInfo: null,
       });
     }
   },
@@ -309,49 +339,119 @@ const convertToListeningBand = (rawScore: number): number => {
 };
 
 /**
- * Calculate overall band score from Reading & Listening
- * Uses official IELTS conversion tables
- *
- * @param answers - User answers
- * @param examData - Exam data with correct answers from backend
- * @returns Overall band score (0-9)
+ * Calculate detailed score with question-level results
+ * Returns both band score and detailed scoring information
  */
-function calculateBandScore(answers: UserAnswers, examData: ExamData): number {
+function calculateDetailedScore(
+  answers: UserAnswers,
+  examData: ExamData,
+  writingEssays?: WritingSubmissions,
+  speakingAudio?: SpeakingSubmissions,
+): { band: number; detailedResults: DetailedResults } {
+  const questionResults: DetailedResults["questionResults"] = [];
   let readingCorrect = 0;
+  let readingTotal = 0;
   let listeningCorrect = 0;
+  let listeningTotal = 0;
 
-  // Count correct Reading answers
+  // Process Reading answers
   if (examData.reading) {
     for (const passage of examData.reading) {
       for (const group of passage.groups) {
-        for (const question of group.questions) {
-          const userAnswer = answers[question.id];
-          if (
-            userAnswer &&
-            question.correctAnswer &&
-            userAnswer.toLowerCase().trim() ===
-              question.correctAnswer.toLowerCase().trim()
-          ) {
-            readingCorrect++;
+        // Handle TABLE_COMPLETION groups
+        if (
+          group.groupType === "TABLE_COMPLETION" &&
+          group.tableData?.questions
+        ) {
+          for (const tq of group.tableData.questions) {
+            readingTotal++;
+            const userAnswer = (answers[tq.id] || "").toString().trim();
+            const correctAnswer = (tq.correctAnswer || "").toString().trim();
+            const isCorrect =
+              userAnswer.toLowerCase() === correctAnswer.toLowerCase() &&
+              userAnswer !== "";
+
+            if (isCorrect) readingCorrect++;
+
+            questionResults.push({
+              id: tq.id,
+              userAnswer,
+              correctAnswer,
+              isCorrect,
+            });
+          }
+        } else {
+          // Normal questions
+          for (const question of group.questions) {
+            readingTotal++;
+            const userAnswer = (answers[question.id] || "").toString().trim();
+            const correctAnswer = (question.correctAnswer || "")
+              .toString()
+              .trim();
+            const isCorrect =
+              userAnswer.toLowerCase() === correctAnswer.toLowerCase() &&
+              userAnswer !== "";
+
+            if (isCorrect) readingCorrect++;
+
+            questionResults.push({
+              id: question.id,
+              userAnswer,
+              correctAnswer,
+              isCorrect,
+            });
           }
         }
       }
     }
   }
 
-  // Count correct Listening answers
+  // Process Listening answers
   if (examData.listening) {
     for (const section of examData.listening) {
       for (const group of section.groups) {
-        for (const question of group.questions) {
-          const userAnswer = answers[question.id];
-          if (
-            userAnswer &&
-            question.correctAnswer &&
-            userAnswer.toLowerCase().trim() ===
-              question.correctAnswer.toLowerCase().trim()
-          ) {
-            listeningCorrect++;
+        // Handle TABLE_COMPLETION groups
+        if (
+          group.groupType === "TABLE_COMPLETION" &&
+          group.tableData?.questions
+        ) {
+          for (const tq of group.tableData.questions) {
+            listeningTotal++;
+            const userAnswer = (answers[tq.id] || "").toString().trim();
+            const correctAnswer = (tq.correctAnswer || "").toString().trim();
+            const isCorrect =
+              userAnswer.toLowerCase() === correctAnswer.toLowerCase() &&
+              userAnswer !== "";
+
+            if (isCorrect) listeningCorrect++;
+
+            questionResults.push({
+              id: tq.id,
+              userAnswer,
+              correctAnswer,
+              isCorrect,
+            });
+          }
+        } else {
+          // Normal questions
+          for (const question of group.questions) {
+            listeningTotal++;
+            const userAnswer = (answers[question.id] || "").toString().trim();
+            const correctAnswer = (question.correctAnswer || "")
+              .toString()
+              .trim();
+            const isCorrect =
+              userAnswer.toLowerCase() === correctAnswer.toLowerCase() &&
+              userAnswer !== "";
+
+            if (isCorrect) listeningCorrect++;
+
+            questionResults.push({
+              id: question.id,
+              userAnswer,
+              correctAnswer,
+              isCorrect,
+            });
           }
         }
       }
@@ -362,7 +462,28 @@ function calculateBandScore(answers: UserAnswers, examData: ExamData): number {
   const readingBand = convertToReadingBand(readingCorrect);
   const listeningBand = convertToListeningBand(listeningCorrect);
 
-  // Calculate average (IELTS rounds to nearest 0.5)
+  // Calculate average band (IELTS rounds to nearest 0.5)
   const average = (readingBand + listeningBand) / 2;
-  return Math.round(average * 2) / 2; // Round to nearest 0.5
+  const band = Math.round(average * 2) / 2;
+
+  const detailedResults: DetailedResults = {
+    answers,
+    scoring: {
+      reading: {
+        correct: readingCorrect,
+        total: readingTotal,
+        band: readingBand,
+      },
+      listening: {
+        correct: listeningCorrect,
+        total: listeningTotal,
+        band: listeningBand,
+      },
+      writing: { submitted: Object.keys(writingEssays || {}).length > 0 },
+      speaking: { submitted: Object.keys(speakingAudio || {}).length > 0 },
+    },
+    questionResults,
+  };
+
+  return { band, detailedResults };
 }

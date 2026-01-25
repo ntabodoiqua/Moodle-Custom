@@ -28,7 +28,7 @@ const QuestionRenderer = ({
 
   // Render based on question type
   switch (type) {
-    // Single choice - Radio buttons
+    // Single choice - Radio buttons (uses A, B, C keys)
     case "MULTIPLE_CHOICE":
       return (
         <Radio.Group
@@ -36,15 +36,18 @@ const QuestionRenderer = ({
           value={answer || undefined}
           onChange={(e) => onAnswerChange(id, e.target.value)}
         >
-          {options?.map((opt, idx) => (
-            <Radio key={idx} value={opt} className={styles.radioItem}>
-              {opt}
-            </Radio>
-          ))}
+          {options?.map((opt, idx) => {
+            const key = String.fromCharCode(65 + idx); // A, B, C, D...
+            return (
+              <Radio key={idx} value={key} className={styles.radioItem}>
+                {key}. {opt}
+              </Radio>
+            );
+          })}
         </Radio.Group>
       );
 
-    // Multiple choice with multiple correct answers
+    // Multiple choice with multiple correct answers (uses A, B, C keys)
     case "MULTIPLE_CHOICE_MULTI":
       return (
         <div className={styles.multiChoiceContainer}>
@@ -56,11 +59,14 @@ const QuestionRenderer = ({
             value={getMultiSelectValues()}
             onChange={handleMultiSelect}
           >
-            {options?.map((opt, idx) => (
-              <Checkbox key={idx} value={opt} className={styles.checkboxItem}>
-                {opt}
-              </Checkbox>
-            ))}
+            {options?.map((opt, idx) => {
+              const key = String.fromCharCode(65 + idx); // A, B, C, D...
+              return (
+                <Checkbox key={idx} value={key} className={styles.checkboxItem}>
+                  {key}. {opt}
+                </Checkbox>
+              );
+            })}
           </Checkbox.Group>
         </div>
       );

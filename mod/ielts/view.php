@@ -182,6 +182,32 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         }
     }
 
+    // Teacher grading link (if user has grade capability).
+    if (has_capability('mod/ielts:grade', $context)) {
+        $examdata = json_decode($ielts->content_json, true);
+        $haswriting = !empty($examdata['writing']);
+        $hasspeaking = !empty($examdata['speaking']);
+        
+        if ($haswriting || $hasspeaking) {
+            echo html_writer::start_div('card mb-4 border-warning');
+            echo html_writer::start_div('card-body');
+            echo html_writer::start_div('d-flex justify-content-between align-items-center');
+            echo html_writer::start_div();
+            echo html_writer::tag('h5', '<i class="fa fa-pencil-square-o mr-2"></i>' . get_string('manualgrading', 'mod_ielts'), 
+                ['class' => 'card-title mb-1']);
+            echo html_writer::tag('p', 'Grade student Writing and Speaking submissions', ['class' => 'text-muted mb-0']);
+            echo html_writer::end_div();
+            $gradingurl = new moodle_url('/mod/ielts/grading.php', ['id' => $cm->id]);
+            echo html_writer::link($gradingurl,
+                '<i class="fa fa-tasks mr-2"></i>' . get_string('gradinglink', 'mod_ielts'),
+                ['class' => 'btn btn-warning']
+            );
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+        }
+    }
+
     // Summary card.
     echo html_writer::start_div('card mb-4');
     echo html_writer::start_div('card-body');

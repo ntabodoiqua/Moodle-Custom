@@ -39,7 +39,7 @@ const ResultPage = ({ config }: ResultPageProps) => {
     examData,
     timeTaken,
     isReviewMode,
-    reviewBand,
+    gradingInfo,
   } = useExamStore();
 
   // Format time taken for display
@@ -289,58 +289,6 @@ const ResultPage = ({ config }: ResultPageProps) => {
   const accuracy =
     totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
-  // IELTS Official Band Score Conversion Tables (Academic)
-  // Based on official IELTS scoring: https://www.ielts.org/
-  const convertToReadingBand = (rawScore: number): number => {
-    // IELTS Academic Reading: 40 questions
-    // This is the official conversion table
-    if (rawScore >= 39) return 9.0;
-    if (rawScore >= 37) return 8.5;
-    if (rawScore >= 35) return 8.0;
-    if (rawScore >= 33) return 7.5;
-    if (rawScore >= 30) return 7.0;
-    if (rawScore >= 27) return 6.5;
-    if (rawScore >= 23) return 6.0;
-    if (rawScore >= 19) return 5.5;
-    if (rawScore >= 15) return 5.0;
-    if (rawScore >= 13) return 4.5;
-    if (rawScore >= 10) return 4.0;
-    if (rawScore >= 8) return 3.5;
-    if (rawScore >= 6) return 3.0;
-    if (rawScore >= 4) return 2.5;
-    return 2.0;
-  };
-
-  const convertToListeningBand = (rawScore: number): number => {
-    // IELTS Listening: 40 questions
-    // This is the official conversion table
-    if (rawScore >= 39) return 9.0;
-    if (rawScore >= 37) return 8.5;
-    if (rawScore >= 35) return 8.0;
-    if (rawScore >= 32) return 7.5;
-    if (rawScore >= 30) return 7.0;
-    if (rawScore >= 26) return 6.5;
-    if (rawScore >= 23) return 6.0;
-    if (rawScore >= 18) return 5.5;
-    if (rawScore >= 16) return 5.0;
-    if (rawScore >= 13) return 4.5;
-    if (rawScore >= 10) return 4.0;
-    if (rawScore >= 8) return 3.5;
-    if (rawScore >= 6) return 3.0;
-    if (rawScore >= 4) return 2.5;
-    return 2.0;
-  };
-
-  // Note: availableSkills removed - we now show all skills but indicate pending grading
-
-  // Calculate band scores only for available skills
-  const readingScore = hasSkillData(exam, "READING")
-    ? convertToReadingBand(readingResult.correct)
-    : null;
-  const listeningScore = hasSkillData(exam, "LISTENING")
-    ? convertToListeningBand(listeningResult.correct)
-    : null;
-
   // Word count function for writing stats display
   const countWords = (text: string): number => {
     if (!text) return 0;
@@ -358,43 +306,6 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
   // Check if recordings exist for speaking
   const hasRecordings = Object.keys(speakingAudio).length > 0;
-
-  // Calculate overall band score based on auto-graded skills only (Reading & Listening)
-  // Writing & Speaking require teacher grading and are excluded
-  // In review mode, use the pre-calculated band from the database
-  const calculateOverallScore = (): string => {
-    // If in review mode and we have a stored band, use it
-    if (isReviewMode && reviewBand !== null) {
-      return reviewBand.toFixed(1);
-    }
-
-    const scores: number[] = [];
-    // Only include auto-graded skills (Reading & Listening)
-    if (readingScore !== null) scores.push(readingScore);
-    if (listeningScore !== null) scores.push(listeningScore);
-    // Writing & Speaking are excluded - require teacher grading
-
-    if (scores.length === 0) return "-";
-
-    const sum = scores.reduce((acc, score) => acc + score, 0);
-    const average = sum / scores.length;
-
-    // Round to nearest 0.5 (IELTS standard)
-    const rounded = Math.round(average * 2) / 2;
-    return rounded.toFixed(1);
-  };
-
-  const overallScore = calculateOverallScore();
-
-  // Get band description
-  const getBandDescription = (score: number): string => {
-    if (score >= 8.5) return "Expert User";
-    if (score >= 7.5) return "Very Good User";
-    if (score >= 6.5) return "Good User";
-    if (score >= 5.5) return "Competent User";
-    if (score >= 4.5) return "Modest User";
-    return "Limited User";
-  };
 
   // Handle audio playback
   const toggleAudioPlayback = (partId: number) => {
@@ -985,6 +896,23 @@ const ResultPage = ({ config }: ResultPageProps) => {
                 </div>
               );
             })}
+            {/* Teacher feedback for Writing */}
+            {gradingInfo?.writing_feedback && (
+              <div className={styles.teacherFeedback}>
+                <div className={styles.feedbackHeader}>
+                  <CommentOutlined style={{ marginRight: 8 }} />
+                  Teacher Feedback
+                  {gradingInfo.writing_band !== null && (
+                    <span className={styles.feedbackBand}>
+                      Band: {gradingInfo.writing_band.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <div className={styles.feedbackContent}>
+                  {gradingInfo.writing_feedback}
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -1039,6 +967,23 @@ const ResultPage = ({ config }: ResultPageProps) => {
                 </div>
               );
             })}
+            {/* Teacher feedback for Speaking */}
+            {gradingInfo?.speaking_feedback && (
+              <div className={styles.teacherFeedback}>
+                <div className={styles.feedbackHeader}>
+                  <CommentOutlined style={{ marginRight: 8 }} />
+                  Teacher Feedback
+                  {gradingInfo.speaking_band !== null && (
+                    <span className={styles.feedbackBand}>
+                      Band: {gradingInfo.speaking_band.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <div className={styles.feedbackContent}>
+                  {gradingInfo.speaking_feedback}
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -1062,29 +1007,68 @@ const ResultPage = ({ config }: ResultPageProps) => {
       </div>
 
       <div className={styles.container}>
-        {/* Overall Score */}
+        {/* Overall Score - Show correct/total instead of band */}
         <div className={styles.overallScoreSection}>
-          <div className={styles.overallLabel}>Overall Band Score</div>
-          <div className={styles.overallScore}>{overallScore}</div>
-          <div className={styles.overallDescription}>
-            {getBandDescription(parseFloat(overallScore))}
+          <div className={styles.overallLabel}>Overall Score</div>
+          <div className={styles.overallScore}>
+            {correctCount}/{totalQuestions}
           </div>
+          <div className={styles.overallDescription}>{accuracy}% Accuracy</div>
           <div style={{ fontSize: "12px", color: "#888", marginTop: "8px" }}>
             {hasSkillData(exam, "READING") || hasSkillData(exam, "LISTENING")
-              ? "Based on Reading & Listening (auto-graded)"
+              ? "Reading & Listening (auto-graded)"
               : "Awaiting teacher grading"}
           </div>
           {(hasSkillData(exam, "WRITING") ||
             hasSkillData(exam, "SPEAKING")) && (
             <div
-              style={{ fontSize: "11px", color: "#f59e0b", marginTop: "4px" }}
+              style={{
+                fontSize: "11px",
+                color:
+                  (gradingInfo?.writing_band !== null &&
+                    gradingInfo?.writing_band !== undefined) ||
+                  (gradingInfo?.speaking_band !== null &&
+                    gradingInfo?.speaking_band !== undefined)
+                    ? "#10b981"
+                    : "#f59e0b",
+                marginTop: "4px",
+              }}
             >
-              Writing & Speaking scores pending teacher review
+              {(() => {
+                const writingGraded =
+                  gradingInfo?.writing_band !== null &&
+                  gradingInfo?.writing_band !== undefined;
+                const speakingGraded =
+                  gradingInfo?.speaking_band !== null &&
+                  gradingInfo?.speaking_band !== undefined;
+                const hasWriting = hasSkillData(exam, "WRITING");
+                const hasSpeaking = hasSkillData(exam, "SPEAKING");
+
+                if (hasWriting && hasSpeaking) {
+                  if (writingGraded && speakingGraded) {
+                    return "✓ Writing & Speaking graded by teacher";
+                  } else if (writingGraded) {
+                    return "✓ Writing graded • Speaking pending";
+                  } else if (speakingGraded) {
+                    return "Writing pending • ✓ Speaking graded";
+                  }
+                  return "Writing & Speaking pending teacher review";
+                } else if (hasWriting) {
+                  return writingGraded
+                    ? "✓ Writing graded by teacher"
+                    : "Writing pending teacher review";
+                } else if (hasSpeaking) {
+                  return speakingGraded
+                    ? "✓ Speaking graded by teacher"
+                    : "Speaking pending teacher review";
+                }
+                return "";
+              })()}
             </div>
           )}
         </div>
 
-        {/* Skill Scores - Only show available skills */}
+        {/* Skill Scores - Show correct/total only */}
         <div className={styles.skillScoresGrid}>
           {hasSkillData(exam, "READING") && (
             <div className={styles.skillCard}>
@@ -1093,10 +1077,15 @@ const ResultPage = ({ config }: ResultPageProps) => {
               </div>
               <div className={styles.skillName}>Reading</div>
               <div className={styles.skillScore}>
-                {readingScore?.toFixed(1) ?? "-"}
+                {readingResult.correct}/{readingResult.total}
               </div>
               <div className={styles.skillDetails}>
-                {readingResult.correct}/{readingResult.total} correct
+                {readingResult.total > 0
+                  ? Math.round(
+                      (readingResult.correct / readingResult.total) * 100,
+                    )
+                  : 0}
+                % correct
               </div>
             </div>
           )}
@@ -1108,10 +1097,15 @@ const ResultPage = ({ config }: ResultPageProps) => {
               </div>
               <div className={styles.skillName}>Listening</div>
               <div className={styles.skillScore}>
-                {listeningScore?.toFixed(1) ?? "-"}
+                {listeningResult.correct}/{listeningResult.total}
               </div>
               <div className={styles.skillDetails}>
-                {listeningResult.correct}/{listeningResult.total} correct
+                {listeningResult.total > 0
+                  ? Math.round(
+                      (listeningResult.correct / listeningResult.total) * 100,
+                    )
+                  : 0}
+                % correct
               </div>
             </div>
           )}
@@ -1122,21 +1116,44 @@ const ResultPage = ({ config }: ResultPageProps) => {
                 <EditOutlined />
               </div>
               <div className={styles.skillName}>Writing</div>
-              <div
-                className={styles.skillScore}
-                style={{ fontSize: "18px", color: "#f59e0b" }}
-              >
-                Pending
-              </div>
-              <div className={styles.skillDetails}>
-                T1: {task1Words}w • T2: {task2Words}w
-              </div>
-              <div
-                className={styles.skillDetails}
-                style={{ fontSize: "11px", color: "#888" }}
-              >
-                Awaiting teacher grading
-              </div>
+              {gradingInfo?.writing_band !== null &&
+              gradingInfo?.writing_band !== undefined ? (
+                <>
+                  <div
+                    className={styles.skillScore}
+                    style={{ color: "#10b981" }}
+                  >
+                    {gradingInfo.writing_band.toFixed(1)}
+                  </div>
+                  <div className={styles.skillDetails}>
+                    T1: {task1Words}w • T2: {task2Words}w
+                  </div>
+                  <div
+                    className={styles.skillDetails}
+                    style={{ fontSize: "11px", color: "#10b981" }}
+                  >
+                    ✓ Graded by teacher
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    className={styles.skillScore}
+                    style={{ fontSize: "18px", color: "#f59e0b" }}
+                  >
+                    Pending
+                  </div>
+                  <div className={styles.skillDetails}>
+                    T1: {task1Words}w • T2: {task2Words}w
+                  </div>
+                  <div
+                    className={styles.skillDetails}
+                    style={{ fontSize: "11px", color: "#888" }}
+                  >
+                    Awaiting teacher grading
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1146,23 +1163,48 @@ const ResultPage = ({ config }: ResultPageProps) => {
                 <AudioOutlined />
               </div>
               <div className={styles.skillName}>Speaking</div>
-              <div
-                className={styles.skillScore}
-                style={{ fontSize: "18px", color: "#f59e0b" }}
-              >
-                Pending
-              </div>
-              <div className={styles.skillDetails}>
-                {hasRecordings
-                  ? `${Object.keys(speakingAudio).length}/3 parts recorded`
-                  : "Not recorded"}
-              </div>
-              <div
-                className={styles.skillDetails}
-                style={{ fontSize: "11px", color: "#888" }}
-              >
-                Awaiting teacher grading
-              </div>
+              {gradingInfo?.speaking_band !== null &&
+              gradingInfo?.speaking_band !== undefined ? (
+                <>
+                  <div
+                    className={styles.skillScore}
+                    style={{ color: "#10b981" }}
+                  >
+                    {gradingInfo.speaking_band.toFixed(1)}
+                  </div>
+                  <div className={styles.skillDetails}>
+                    {hasRecordings
+                      ? `${Object.keys(speakingAudio).length}/3 parts recorded`
+                      : "Not recorded"}
+                  </div>
+                  <div
+                    className={styles.skillDetails}
+                    style={{ fontSize: "11px", color: "#10b981" }}
+                  >
+                    ✓ Graded by teacher
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    className={styles.skillScore}
+                    style={{ fontSize: "18px", color: "#f59e0b" }}
+                  >
+                    Pending
+                  </div>
+                  <div className={styles.skillDetails}>
+                    {hasRecordings
+                      ? `${Object.keys(speakingAudio).length}/3 parts recorded`
+                      : "Not recorded"}
+                  </div>
+                  <div
+                    className={styles.skillDetails}
+                    style={{ fontSize: "11px", color: "#888" }}
+                  >
+                    Awaiting teacher grading
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
