@@ -28,6 +28,18 @@ interface GradingInfo {
 interface AttemptData {
   band: number;
   answers: UserAnswers;
+  scoring?: {
+    reading?: { correct: number; total: number; band: number };
+    listening?: { correct: number; total: number; band: number };
+    writing?: { submitted: boolean };
+    speaking?: { submitted: boolean };
+  };
+  questionResults?: Array<{
+    id: number;
+    userAnswer: string;
+    correctAnswer: string;
+    isCorrect: boolean;
+  }>;
   writingEssays?: WritingSubmissions;
   speakingAudio?: Record<number, string>; // URLs instead of Blobs for review
   timeTaken?: number;
@@ -53,6 +65,8 @@ interface ExamState {
   // Review mode
   isReviewMode: boolean; // True when reviewing a past attempt
   reviewBand: number | null; // Band score from the reviewed attempt
+  reviewScoring: AttemptData["scoring"] | null; // Scoring data from reviewed attempt
+  reviewQuestionResults: AttemptData["questionResults"] | null; // Question results from reviewed attempt
 
   // Lưu bài làm
   answers: UserAnswers; // Reading & Listening
@@ -101,6 +115,8 @@ export const useExamStore = create<ExamState>((set, get) => ({
   // Review mode
   isReviewMode: false,
   reviewBand: null,
+  reviewScoring: null,
+  reviewQuestionResults: null,
   gradingInfo: null,
 
   answers: {},
@@ -276,6 +292,8 @@ export const useExamStore = create<ExamState>((set, get) => ({
         isReviewMode: true,
         isSubmitted: true, // Mark as submitted to show ResultPage
         reviewBand: attemptData.band,
+        reviewScoring: attemptData.scoring || null,
+        reviewQuestionResults: attemptData.questionResults || null,
         answers: attemptData.answers || {},
         writingEssays: attemptData.writingEssays || {},
         timeTaken: attemptData.timeTaken || null,
@@ -290,6 +308,8 @@ export const useExamStore = create<ExamState>((set, get) => ({
       set({
         isReviewMode: false,
         reviewBand: null,
+        reviewScoring: null,
+        reviewQuestionResults: null,
         gradingInfo: null,
       });
     }
@@ -466,6 +486,10 @@ function calculateDetailedScore(
   const average = (readingBand + listeningBand) / 2;
   const band = Math.round(average * 2) / 2;
 
+  // Note: speakingAudio Blobs need to be uploaded separately to server
+  // For now, we'll mark speaking as submitted but not store the audio in JSON
+  // The audio should be uploaded via a separate API endpoint for file storage
+
   const detailedResults: DetailedResults = {
     answers,
     scoring: {
@@ -483,6 +507,8 @@ function calculateDetailedScore(
       speaking: { submitted: Object.keys(speakingAudio || {}).length > 0 },
     },
     questionResults,
+    writingEssays: writingEssays || {},
+    // speakingAudio: audio files should be uploaded separately
   };
 
   return { band, detailedResults };

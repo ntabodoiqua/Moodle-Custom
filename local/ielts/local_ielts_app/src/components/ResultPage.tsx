@@ -40,6 +40,9 @@ const ResultPage = ({ config }: ResultPageProps) => {
     timeTaken,
     isReviewMode,
     gradingInfo,
+    reviewScoring,
+    reviewQuestionResults,
+    reviewBand,
   } = useExamStore();
 
   // Format time taken for display
@@ -59,16 +62,30 @@ const ResultPage = ({ config }: ResultPageProps) => {
   };
 
   // Determine first available skill for default tab
+  // In review mode, use reviewScoring to determine available skills
   const getFirstAvailableSkill = ():
     | "reading"
     | "listening"
     | "writing"
     | "speaking" => {
+    // In review mode, check what was actually submitted
+    if (isReviewMode && reviewScoring) {
+      if (reviewScoring.reading && reviewScoring.reading.total > 0)
+        return "reading";
+      if (reviewScoring.listening && reviewScoring.listening.total > 0)
+        return "listening";
+      if (reviewScoring.writing?.submitted) return "writing";
+      if (reviewScoring.speaking?.submitted) return "speaking";
+    }
+    // Fallback to examData
     if (examData?.reading?.length) return "reading";
     if (examData?.listening?.length) return "listening";
     if (examData?.writing?.length) return "writing";
     if (examData?.speaking?.length) return "speaking";
-    return "reading"; // Fallback
+    // Last resort: check what answers exist
+    if (Object.keys(answers).length > 0) return "listening"; // Assume listening if we have answers
+    if (Object.keys(writingEssays).length > 0) return "writing";
+    return "listening"; // Better default for review
   };
 
   const [activeReviewTab, setActiveReviewTab] = useState<
@@ -78,6 +95,18 @@ const ResultPage = ({ config }: ResultPageProps) => {
   const [activeReadingPart, setActiveReadingPart] = useState(0);
   const [activeListeningPart, setActiveListeningPart] = useState(0);
   const audioRefs = useRef<{ [key: number]: HTMLAudioElement | null }>({});
+
+  // Debug logging for review mode
+  if (isReviewMode) {
+    console.log("Review Mode Data:", {
+      reviewScoring,
+      reviewQuestionResults,
+      gradingInfo,
+      reviewBand,
+      writingEssays,
+      examData,
+    });
+  }
 
   // IMPORTANT: examData must come from backend API, no fallback to mock
   const exam = examData;
@@ -280,8 +309,22 @@ const ResultPage = ({ config }: ResultPageProps) => {
     return { correct, total };
   };
 
-  const readingResult = calculateReadingScore();
-  const listeningResult = calculateListeningScore();
+  // Use stored scoring from review mode if available, otherwise calculate
+  const readingResult =
+    isReviewMode && reviewScoring?.reading
+      ? {
+          correct: reviewScoring.reading.correct,
+          total: reviewScoring.reading.total,
+        }
+      : calculateReadingScore();
+
+  const listeningResult =
+    isReviewMode && reviewScoring?.listening
+      ? {
+          correct: reviewScoring.listening.correct,
+          total: reviewScoring.listening.total,
+        }
+      : calculateListeningScore();
 
   // Total objective score (Reading + Listening)
   const correctCount = readingResult.correct + listeningResult.correct;

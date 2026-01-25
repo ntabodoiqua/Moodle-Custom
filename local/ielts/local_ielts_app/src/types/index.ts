@@ -27,7 +27,28 @@ export interface MoodleConfig {
     timefinished?: number;
     timeTaken?: number;
     answers: UserAnswers;
+    scoring?: {
+      reading?: { correct: number; total: number; band: number };
+      listening?: { correct: number; total: number; band: number };
+      writing?: { submitted: boolean };
+      speaking?: { submitted: boolean };
+    };
+    questionResults?: Array<{
+      id: number;
+      userAnswer: string;
+      correctAnswer: string;
+      isCorrect: boolean;
+    }>;
     writingEssays?: WritingSubmissions;
+    speakingAudio?: Record<number, string>;
+    grading?: {
+      writing_band: number | null;
+      speaking_band: number | null;
+      writing_feedback: string | null;
+      speaking_feedback: string | null;
+      graded_by: number | null;
+      timegraded: number | null;
+    } | null;
   };
   backUrl?: string;
 }

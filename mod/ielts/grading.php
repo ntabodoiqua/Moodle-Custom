@@ -85,10 +85,15 @@ function show_grading_list($ielts, $cm, $course, $context) {
     }
 
     // Get all user name fields for fullname() function.
-    $userfields = \core_user\fields::for_name()->with_userpic()->including('email')->get_sql('u', false, '', '', false)->selects;
+    // Use alias prefix to avoid column name conflicts with attempt table
+    $userfieldsobj = \core_user\fields::for_name()->with_userpic()->including('email')->get_sql('u', false, 'user_', '', false);
 
     // Get all completed attempts for this activity.
-    $sql = "SELECT a.*, $userfields
+    // Ensure a.id is the first column (unique key for get_records_sql)
+    $sql = "SELECT a.id, a.ieltsid, a.userid, a.score_data, a.final_band, a.timecreated, a.timefinished,
+                   a.reading_band, a.listening_band, a.writing_band, a.speaking_band,
+                   a.writing_feedback, a.speaking_feedback, a.graded_by, a.timegraded,
+                   {$userfieldsobj->selects}
             FROM {ielts_attempts} a
             JOIN {user} u ON u.id = a.userid
             WHERE a.ieltsid = :ieltsid
@@ -218,9 +223,18 @@ function show_grading_list($ielts, $cm, $course, $context) {
 
         echo html_writer::start_tag('tr');
 
-        // Student name.
-        $studentname = fullname($attempt);
-        echo html_writer::tag('td', $studentname . html_writer::tag('div', $attempt->email, ['class' => 'small text-muted']));
+        // Student name - build user object from aliased fields.
+        $user = new stdClass();
+        $user->id = $attempt->userid;
+        foreach (get_object_vars($attempt) as $key => $value) {
+            if (strpos($key, 'user_') === 0) {
+                $realkey = substr($key, 5); // Remove 'user_' prefix
+                $user->$realkey = $value;
+            }
+        }
+        $studentname = fullname($user);
+        $useremail = $user->email ?? '';
+        echo html_writer::tag('td', $studentname . html_writer::tag('div', $useremail, ['class' => 'small text-muted']));
 
         // Submitted date.
         echo html_writer::tag('td', userdate($attempt->timefinished, get_string('strftimedatetime', 'langconfig')));

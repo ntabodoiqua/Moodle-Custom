@@ -64,8 +64,15 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
   // Track the previous timeLeft value to detect when it goes from >0 to 0
   const prevTimeLeftRef = useRef<number>(0);
 
-  // Check if we're in review mode
+  // Check if we're in review mode - use config as source of truth
   const isReviewMode = config.reviewMode === true;
+
+  // REVIEW MODE: Immediately navigate to result page and prevent other navigations
+  useEffect(() => {
+    if (isReviewMode && location.pathname !== ROUTES.RESULT) {
+      navigate(ROUTES.RESULT, { replace: true });
+    }
+  }, [isReviewMode, location.pathname, navigate]);
 
   // Get available skills from exam data
   const availableSkills = useMemo(
@@ -138,8 +145,10 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     return getSkillDuration(skill, examData);
   };
 
-  // 2. Set initial skill and timer when exam loads
+  // 2. Set initial skill and timer when exam loads (skip in review mode)
   useEffect(() => {
+    // Skip skill initialization in review mode
+    if (isReviewMode) return;
     if (loading || isSubmitted || !examData || availableSkills.length === 0)
       return;
 
@@ -158,6 +167,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     availableSkills,
     currentSkill,
     setSkill,
+    isReviewMode,
     timeLeft,
   ]);
 
@@ -201,6 +211,8 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
 
   // Navigate based on current skill (only if skill is available)
   useEffect(() => {
+    // Don't navigate if in review mode - stay on result page
+    if (isReviewMode) return;
     // Don't navigate if already submitted or on result page
     if (loading || isSubmitted) return;
     // CRITICAL: Don't navigate away from result page
@@ -225,6 +237,7 @@ const ExamLayout = ({ config }: ExamLayoutProps) => {
     navigate,
     availableSkills,
     location.pathname,
+    isReviewMode,
   ]);
 
   const handleTimeOut = () => {

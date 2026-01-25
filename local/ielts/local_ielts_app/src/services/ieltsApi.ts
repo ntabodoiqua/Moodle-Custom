@@ -149,6 +149,7 @@ export interface DetailedResults {
     correctAnswer: string;
     isCorrect: boolean;
   }>;
+  writingEssays?: Record<number, string>;
 }
 
 export const submitExamResult = async (
