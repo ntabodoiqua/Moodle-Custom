@@ -9,21 +9,44 @@ interface TableQuestionProps {
   questionIdPrefix?: string; // Prefix for generating question IDs (e.g., "listening-question-")
 }
 
-// Extract question number from cell content like "[1]", "[2]", etc.
+// Extract question number from cell content like "[1]", "[2]", "[2] Nelson", etc.
+// Returns the first [number] found in the cell content
 const extractQuestionNumber = (cellContent: string): number | null => {
-  const match = cellContent.match(/^\[(\d+)\]$/);
+  const match = cellContent.match(/\[(\d+)\]/);
   return match ? parseInt(match[1], 10) : null;
 };
 
-// Parse a cell to check if it's a question input or plain text
-const parseCell = (
-  cellContent: string,
-): { isQuestion: boolean; questionNumber: number | null; text: string } => {
-  const questionNumber = extractQuestionNumber(cellContent.trim());
-  if (questionNumber !== null) {
-    return { isQuestion: true, questionNumber, text: "" };
+// Parse cell content and extract parts before and after the gap marker
+// Handles formats like: "[1]", "[2] Nelson", "Name: [3]", "[4] (surname)"
+interface ParsedCellContent {
+  isQuestion: boolean;
+  questionNumber: number | null;
+  textBefore: string;
+  textAfter: string;
+}
+
+const parseCell = (cellContent: string): ParsedCellContent => {
+  const trimmed = cellContent.trim();
+  const match = trimmed.match(/^(.*?)\[(\d+)\](.*)$/);
+
+  if (match) {
+    const textBefore = match[1].trim();
+    const questionNumber = parseInt(match[2], 10);
+    const textAfter = match[3].trim();
+    return {
+      isQuestion: true,
+      questionNumber,
+      textBefore,
+      textAfter,
+    };
   }
-  return { isQuestion: false, questionNumber: null, text: cellContent };
+
+  return {
+    isQuestion: false,
+    questionNumber: null,
+    textBefore: cellContent,
+    textAfter: "",
+  };
 };
 
 // Build a map from display number (from cell content) to actual question ID
@@ -98,6 +121,11 @@ const TableQuestion = ({
                         <span className={styles.questionNumber}>
                           {displayNumber}.
                         </span>
+                        {parsed.textBefore && (
+                          <span className={styles.cellText}>
+                            {parsed.textBefore}
+                          </span>
+                        )}
                         <Input
                           className={styles.tableInput}
                           placeholder="Type your answer"
@@ -106,6 +134,11 @@ const TableQuestion = ({
                             onAnswerChange(questionId, e.target.value)
                           }
                         />
+                        {parsed.textAfter && (
+                          <span className={styles.cellText}>
+                            {parsed.textAfter}
+                          </span>
+                        )}
                       </div>
                     </td>
                   );
@@ -113,7 +146,7 @@ const TableQuestion = ({
 
                 return (
                   <td key={cellIndex} className={styles.tableCell}>
-                    <span className={styles.cellText}>{parsed.text}</span>
+                    <span className={styles.cellText}>{parsed.textBefore}</span>
                   </td>
                 );
               })}
