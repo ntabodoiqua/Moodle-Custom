@@ -67,7 +67,7 @@ export type QuestionType =
   | "TABLE_COMPLETION";
 
 // Group types for special question layouts
-export type GroupType = "NORMAL" | "TABLE_COMPLETION";
+export type GroupType = "NORMAL" | "TABLE_COMPLETION" | "MAP_DIAGRAM";
 
 // Table question with correct answer (for scoring)
 export interface TableQuestion {
@@ -103,6 +103,8 @@ export interface QuestionGroup {
   questions: Question[];
   groupType?: GroupType; // Type of group layout (default: NORMAL)
   tableData?: TableData; // Data for TABLE_COMPLETION groups
+  imageUrl?: string; // URL hình ảnh map/diagram (cho MAP_DIAGRAM groups)
+  imageAlt?: string; // Mô tả hình ảnh cho accessibility
 }
 
 // --- READING ---

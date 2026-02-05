@@ -332,3 +332,21 @@
   color: #1f2937;
   font-weight: 700;
 }
+
+/* Map/Diagram Image Styles */
+.groupImageContainer {
+  margin: 20px 0 30px;
+  text-align: center;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.groupImage {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

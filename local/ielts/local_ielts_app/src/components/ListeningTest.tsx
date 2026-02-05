@@ -208,10 +208,21 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
             <div key={group.id} className={styles.questionSection}>
               <h3 className={styles.questionSectionTitle}>{group.title}</h3>
 
-              {/* Render instruction only for non-table groups or custom instruction */}
-              {group.instruction && group.groupType !== "TABLE_COMPLETION" && (
+              {/* Render instruction */}
+              {group.instruction && (
                 <div className={styles.questionInstruction}>
                   {group.instruction}
+                </div>
+              )}
+
+              {/* Render map/diagram image if present */}
+              {group.imageUrl && (
+                <div className={styles.groupImageContainer}>
+                  <img
+                    src={group.imageUrl}
+                    alt={group.imageAlt || "Map/Diagram"}
+                    className={styles.groupImage}
+                  />
                 </div>
               )}
 

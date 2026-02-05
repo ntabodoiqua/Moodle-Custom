@@ -20,7 +20,7 @@
  * Shows attempt history and allows starting new attempts or reviewing past ones.
  *
  * @package    mod_ielts
- * @copyright  2025 Your Name
+ * @copyright  2026 Nguyen The Anh
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

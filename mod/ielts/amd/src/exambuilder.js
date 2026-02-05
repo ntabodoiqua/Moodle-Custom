@@ -72,6 +72,7 @@ define([
   const groupTypes = [
     { value: "NORMAL", label: "Normal Questions" },
     { value: "TABLE_COMPLETION", label: "Table Completion" },
+    { value: "MAP_DIAGRAM", label: "Map/Diagram Labeling" },
   ];
 
   /**
@@ -260,13 +261,6 @@ define([
         group.groupType = newType;
         groupEl.attr("data-group-type", newType);
 
-        // Toggle instruction visibility
-        if (newType === "TABLE_COMPLETION") {
-          groupEl.find(".group-instruction-container").hide();
-        } else {
-          groupEl.find(".group-instruction-container").show();
-        }
-
         // Re-render the content area
         const contentContainer = groupEl.find(".group-content-container");
         if (newType === "TABLE_COMPLETION") {
@@ -280,6 +274,13 @@ define([
             };
           }
           contentContainer.html(renderTableEditor(group));
+        } else if (newType === "MAP_DIAGRAM") {
+          // Initialize imageUrl if needed
+          if (!group.imageUrl) {
+            group.imageUrl = "";
+            group.imageAlt = "";
+          }
+          contentContainer.html(renderMapDiagramEditor(group, skill));
         } else {
           // Switch back to normal questions
           contentContainer.html(`
@@ -440,6 +441,55 @@ define([
           question.correctAnswer = $(this).val();
           updateBuilderJson();
         }
+      }
+    });
+
+    // Map/Diagram image URL change - update preview
+    $(document).on("input", ".map-image-url", function () {
+      const mapEditor = $(this).closest(".map-diagram-editor");
+      const groupId = mapEditor.data("group-id");
+      const imageUrl = $(this).val();
+
+      const group = findGroupById(groupId);
+      if (group) {
+        group.imageUrl = imageUrl;
+
+        // Update preview
+        const previewContainer = mapEditor.find(
+          ".map-image-preview, .map-image-placeholder",
+        );
+        if (imageUrl) {
+          const altText =
+            mapEditor.find(".map-image-alt").val() || "Map/Diagram preview";
+          previewContainer.replaceWith(`
+            <div class="map-image-preview mb-3 text-center p-3 bg-light border rounded">
+              <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(altText)}" 
+                style="max-width: 100%; max-height: 300px; border-radius: 4px;"
+                onerror="this.parentElement.innerHTML='<p class=\\'text-danger\\'>Failed to load image. Please check the URL.</p>'">
+            </div>
+          `);
+        } else {
+          previewContainer.replaceWith(`
+            <div class="map-image-placeholder mb-3 text-center p-4 bg-light border rounded text-muted">
+              <i class="fa fa-image fa-3x mb-2"></i>
+              <p class="mb-0">Image preview will appear here after entering URL</p>
+            </div>
+          `);
+        }
+
+        updateBuilderJson();
+      }
+    });
+
+    // Map/Diagram image alt text change
+    $(document).on("input", ".map-image-alt", function () {
+      const mapEditor = $(this).closest(".map-diagram-editor");
+      const groupId = mapEditor.data("group-id");
+
+      const group = findGroupById(groupId);
+      if (group) {
+        group.imageAlt = $(this).val();
+        updateBuilderJson();
       }
     });
   }
@@ -945,13 +995,20 @@ define([
       .join("");
 
     const isTableGroup = group.groupType === "TABLE_COMPLETION";
-    const questionsContainerHtml = isTableGroup
-      ? renderTableEditor(group)
-      : `<div class="questions-container" data-group-id="${group.id}"></div>
+    const isMapDiagramGroup = group.groupType === "MAP_DIAGRAM";
+
+    let questionsContainerHtml;
+    if (isTableGroup) {
+      questionsContainerHtml = renderTableEditor(group);
+    } else if (isMapDiagramGroup) {
+      questionsContainerHtml = renderMapDiagramEditor(group, skill);
+    } else {
+      questionsContainerHtml = `<div class="questions-container" data-group-id="${group.id}"></div>
          <button type="button" class="btn btn-sm btn-outline-info add-question" 
              data-group-id="${group.id}" data-skill="${skill}">
              <i class="fa fa-plus"></i> Add Question
          </button>`;
+    }
 
     const html = `
             <div class="question-group card mb-2" data-group-id="${group.id}" data-group-type="${group.groupType || "NORMAL"}">
@@ -971,7 +1028,7 @@ define([
                     </button>
                 </div>
                 <div class="card-body py-2">
-                    <div class="form-group mb-2 group-instruction-container" style="${isTableGroup ? "display:none;" : ""}">
+                    <div class="form-group mb-2 group-instruction-container">
                         <input type="text" class="form-control form-control-sm group-instruction" 
                             value="${escapeHtml(group.instruction || "")}" 
                             placeholder="Instructions (e.g., Choose the correct letter A, B, C or D)">
@@ -1007,12 +1064,20 @@ define([
   function addQuestion(groupId, skill) {
     const questionId = idCounters.question++;
     const nextNum = getNextQuestionNumber(skill);
+
+    // Find the group to check its type
+    const targetGroup = findGroupById(groupId);
+    const isMapDiagramGroup =
+      targetGroup && targetGroup.groupType === "MAP_DIAGRAM";
+
     const question = {
       id: questionId,
       number: String(nextNum),
       text: "",
-      type: "MULTIPLE_CHOICE",
-      options: ["", "", "", ""],
+      type: isMapDiagramGroup ? "MAP_LABELING" : "MULTIPLE_CHOICE",
+      options: isMapDiagramGroup
+        ? ["A", "B", "C", "D", "E", "F", "G", "H"]
+        : ["", "", "", ""],
       correctAnswer: "",
     };
 
@@ -1158,8 +1223,14 @@ define([
       case "MATCHING":
         question.matchItems = question.matchItems || ["", "", "", ""];
         break;
-      case "SHORT_ANSWER":
       case "MAP_LABELING":
+        // Initialize with default labels A-H for map/diagram labeling
+        question.options =
+          question.options && question.options.length > 0
+            ? question.options
+            : ["A", "B", "C", "D", "E", "F", "G", "H"];
+        break;
+      case "SHORT_ANSWER":
       default:
         question.options = [];
         break;
@@ -1188,11 +1259,58 @@ define([
           "Enter items to match (headings, information, features, endings, etc.)",
         );
 
-      case "SHORT_ANSWER":
       case "MAP_LABELING":
+        return renderMapLabelingEditor(question);
+
+      case "SHORT_ANSWER":
       default:
         return renderSimpleAnswerHint(question);
     }
+  }
+
+  /**
+   * Render editor for MAP_LABELING questions
+   */
+  function renderMapLabelingEditor(question) {
+    // Initialize default labels if not present
+    if (!question.options || question.options.length === 0) {
+      question.options = ["A", "B", "C", "D", "E", "F", "G", "H"];
+    }
+
+    const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+    let html = `
+      <div class="alert alert-info py-1 px-2 mb-2" style="font-size: 12px;">
+        <i class="fa fa-map-marker"></i> <strong>Map/Diagram Labeling:</strong> 
+        Enter the label options available on the map (A, B, C, etc.). Students will select from these.
+      </div>
+      <label class="small font-weight-bold">Available Labels:</label>
+      <div class="options-list mb-2">`;
+
+    question.options.forEach((opt, idx) => {
+      html += `
+        <div class="input-group input-group-sm mb-1">
+          <div class="input-group-prepend">
+            <span class="input-group-text">${letters[idx] || idx + 1}</span>
+          </div>
+          <input type="text" class="form-control option-input" data-index="${idx}" 
+            value="${escapeHtml(opt)}" placeholder="Label ${letters[idx] || idx + 1} description (optional)">
+          <div class="input-group-append">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-option" data-index="${idx}">
+              <i class="fa fa-times"></i>
+            </button>
+          </div>
+        </div>`;
+    });
+
+    html += `</div>
+      <button type="button" class="btn btn-xs btn-link add-option" data-question-id="${question.id}">
+        + Add Label Option
+      </button>
+      <div class="alert alert-secondary py-1 px-2 mt-2 mb-0" style="font-size: 11px;">
+        <i class="fa fa-lightbulb-o"></i> Enter the correct label letter (e.g., "C") in the answer field below.
+      </div>`;
+
+    return html;
   }
 
   /**
@@ -1388,6 +1506,70 @@ define([
             ${renderTableQuestionsEditor(group)}
           </div>
         </div>
+      </div>`;
+
+    return html;
+  }
+
+  /**
+   * Render Map/Diagram editor for MAP_DIAGRAM groups
+   */
+  function renderMapDiagramEditor(group, skill) {
+    const imageUrl = group.imageUrl || "";
+    const imageAlt = group.imageAlt || "";
+
+    let html = `
+      <div class="map-diagram-editor" data-group-id="${group.id}">
+        <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
+          <i class="fa fa-info-circle"></i> <strong>Map/Diagram Labeling:</strong> 
+          Upload or link to an image showing the map/diagram with labeled locations (A, B, C, etc.).
+          Then add questions where students select the correct label for each item.
+        </div>
+        
+        <div class="form-group mb-3">
+          <label class="font-weight-bold"><i class="fa fa-image"></i> Image URL</label>
+          <input type="url" class="form-control map-image-url" 
+            value="${escapeHtml(imageUrl)}" 
+            placeholder="https://example.com/map-diagram.png">
+          <small class="form-text text-muted">
+            Enter the URL of your map or diagram image. The image should have locations marked with letters (A, B, C, etc.)
+          </small>
+        </div>
+        
+        <div class="form-group mb-3">
+          <label class="font-weight-bold">Image Description (for accessibility)</label>
+          <input type="text" class="form-control map-image-alt" 
+            value="${escapeHtml(imageAlt)}" 
+            placeholder="e.g., Campus map showing buildings A through G">
+        </div>
+        
+        ${
+          imageUrl
+            ? `
+          <div class="map-image-preview mb-3 text-center p-3 bg-light border rounded">
+            <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(imageAlt || "Map/Diagram preview")}" 
+              style="max-width: 100%; max-height: 300px; border-radius: 4px;">
+          </div>
+        `
+            : `
+          <div class="map-image-placeholder mb-3 text-center p-4 bg-light border rounded text-muted">
+            <i class="fa fa-image fa-3x mb-2"></i>
+            <p class="mb-0">Image preview will appear here after entering URL</p>
+          </div>
+        `
+        }
+        
+        <hr>
+        <h6 class="font-weight-bold"><i class="fa fa-list-ol"></i> Questions</h6>
+        <p class="text-muted small mb-2">
+          Add questions for each item to be labeled. Students will select from the available labels (A, B, C, etc.)
+        </p>
+        
+        <div class="questions-container" data-group-id="${group.id}"></div>
+        <button type="button" class="btn btn-sm btn-outline-info add-question" 
+            data-group-id="${group.id}" data-skill="${skill}">
+            <i class="fa fa-plus"></i> Add Question
+        </button>
       </div>`;
 
     return html;
@@ -2468,6 +2650,47 @@ define([
         // Clear normal questions for table groups
         group.questions = [];
       }
+    } else if (groupType === "MAP_DIAGRAM") {
+      // MAP_DIAGRAM group - save image URL and alt text
+      const mapEditor = groupEl.find(".map-diagram-editor");
+      if (mapEditor.length > 0) {
+        group.imageUrl = mapEditor.find(".map-image-url").val() || "";
+        group.imageAlt = mapEditor.find(".map-image-alt").val() || "";
+      }
+
+      // Update questions for map labeling
+      if (group.questions) {
+        group.questions.forEach(function (question) {
+          const questionEl = $(
+            `.question-item[data-question-id="${question.id}"]`,
+          );
+          question.number =
+            questionEl.find(".question-number").val() || question.number;
+          question.text = questionEl.find(".question-text").val() || "";
+          question.type =
+            questionEl.find(".question-type").val() || "MAP_LABELING";
+          question.correctAnswer =
+            questionEl.find(".question-answer").val() || "";
+
+          // Options for matching/labeling types
+          if (
+            question.type === "MAP_LABELING" ||
+            question.type === "MATCHING"
+          ) {
+            question.options = [];
+            questionEl.find(".option-input").each(function () {
+              question.options.push($(this).val());
+            });
+            question.matchItems = [];
+            questionEl.find(".match-item-input").each(function () {
+              question.matchItems.push($(this).val());
+            });
+          }
+        });
+      }
+
+      // Clear tableData for map groups
+      delete group.tableData;
     } else {
       // Normal group - update questions
       if (group.questions) {
