@@ -1245,6 +1245,9 @@ define([
         <select class="form-control form-control-sm num-correct" style="width: 80px;">
           <option value="2" ${question.numCorrect === 2 ? "selected" : ""}>2</option>
           <option value="3" ${question.numCorrect === 3 ? "selected" : ""}>3</option>
+          <option value="4" ${question.numCorrect === 4 ? "selected" : ""}>4</option>
+          <option value="5" ${question.numCorrect === 5 ? "selected" : ""}>5</option>
+          <option value="6" ${question.numCorrect === 6 ? "selected" : ""}>6</option>
         </select>
       </div>
       <div class="options-list mb-2">`;
