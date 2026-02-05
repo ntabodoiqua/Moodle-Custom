@@ -1,37 +1,18 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
-
 /**
- * IELTS activity view page.
- *
- * Shows attempt history and allows starting new attempts or reviewing past ones.
- *
- * @package    mod_ielts
- * @copyright  2026 Nguyen The Anh
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * Trang view của activity IELTS.
  */
 
+// cấu hình
 require_once('../../config.php');
 require_once($CFG->dirroot . '/mod/ielts/lib.php');
 
-// Get course module id or instance id.
-$id = optional_param('id', 0, PARAM_INT); // Course Module ID.
-$i  = optional_param('i', 0, PARAM_INT);  // IELTS instance ID.
-$action = optional_param('action', '', PARAM_ALPHA); // Action: 'attempt' to start exam.
+// lấy tham số từ url
+$id = optional_param('id', 0, PARAM_INT); // ID module.
+$i  = optional_param('i', 0, PARAM_INT);  // ID ielts
+$action = optional_param('action', '', PARAM_ALPHA);
 
+// query db lấy course module, course và instance của ielts
 if ($id) {
     $cm = get_coursemodule_from_id('ielts', $id, 0, false, MUST_EXIST);
     $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
@@ -41,45 +22,47 @@ if ($id) {
     $course = $DB->get_record('course', ['id' => $ielts->course], '*', MUST_EXIST);
     $cm = get_coursemodule_from_instance('ielts', $ielts->id, $course->id, false, MUST_EXIST);
 } else {
+    // ném lỗi nếu không có id hoặc ieltsid
     throw new moodle_exception('invalidieltsid', 'mod_ielts');
 }
 
-// Require login and course access.
+
+// kiểm tra quyền truy cập
+
+// yêu cầu đăng nhập vào khóa học
 require_login($course, true, $cm);
 
-// Get module context.
+// lấy context
 $context = context_module::instance($cm->id);
 
-// Check view capability.
+// kiểm tra quyền xem.
 require_capability('mod/ielts:view', $context);
 
-// Trigger view event and mark as viewed for completion.
+// đánh dấu đã xem trang này.
 ielts_view($ielts, $course, $cm, $context);
 
-// Check if exam content is configured.
+// kiểm tra xem bài thi đã được cấu hình nội dung JSON chưa
 $examConfigured = !empty($ielts->content_json);
 
-// If action is 'attempt', go directly to the exam (React app).
+// có lệnh 'attempt' và bài thi đã sẵn sàng => chuyển sang giao diện thi
 if ($action === 'attempt' && $examConfigured) {
     render_exam_page($ielts, $cm, $course, $context);
     exit;
 }
 
-// Otherwise, show the overview page with attempts.
+// mặc định hiển thị trang tổng quan
 render_overview_page($ielts, $cm, $course, $context, $examConfigured);
 
-/**
- * Render the exam page with React app.
- */
+// hàm hiển thị giao diện thi sử dụng React.
 function render_exam_page($ielts, $cm, $course, $context) {
     global $USER, $CFG;
 
-    // Prepare Moodle configuration for React app.
+   // chuẩn bị dữ liệu cấu hình để truyền sang React
     $moodleconfig = [
         'userId' => $USER->id,
         'sesskey' => sesskey(),
         'wwwroot' => $CFG->wwwroot,
-        'apiEndpoint' => $CFG->wwwroot . '/mod/ielts/api.php',
+        'apiEndpoint' => $CFG->wwwroot . '/mod/ielts/api.php', // API để React gửi/nhận dữ liệu
         'instanceId' => (int) $ielts->id,
         'cmId' => (int) $cm->id,
         'courseId' => (int) $course->id,
@@ -89,11 +72,11 @@ function render_exam_page($ielts, $cm, $course, $context) {
 
     $configjson = json_encode($moodleconfig, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
 
-    // Find the correct asset files with hash in filename.
+    // tìm file được tạo ra sau khi build React
     $mainjs = '';
     $maincss = '';
     
-    // Read from index.html to get the exact file.
+    // đọc file index.html từ thư mục build để lấy đúng tên file
     $indexhtml = file_get_contents($CFG->dirroot . '/mod/ielts/build/index.html');
     if (preg_match('/src="[^"]*\/assets\/(index-[^"]+\.js)"/', $indexhtml, $matches)) {
         $mainjs = $matches[1];
@@ -105,7 +88,7 @@ function render_exam_page($ielts, $cm, $course, $context) {
     $cssurl = $maincss ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $maincss : '';
     $jsurl = $mainjs ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $mainjs : '';
 
-    // Output raw HTML without Moodle's header/footer to avoid reactive component errors.
+    // Xuất mã HTML thuần, không dùng Header/Footer của Moodle để tránh xung đột với CSS của React
     ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -133,44 +116,44 @@ function render_exam_page($ielts, $cm, $course, $context) {
 }
 
 /**
- * Render the overview page with attempt history.
+ * Hàm hiển thị trang tổng quan của hoạt động IELTS.
  */
 function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
     global $PAGE, $OUTPUT, $USER, $DB;
 
-    // Set up the page.
+    // Thiết lập các thuộc tính của trang Moodle
     $PAGE->set_url('/mod/ielts/view.php', ['id' => $cm->id]);
     $PAGE->set_title($course->shortname . ': ' . $ielts->name);
     $PAGE->set_heading($course->fullname);
     $PAGE->set_context($context);
 
-    // Use standard layout.
+    // Sử dụng bố cục chuẩn.
     $PAGE->set_pagelayout('standard');
 
-    // Output page header.
+    // Xuất phần đầu trang.
     echo $OUTPUT->header();
 
-    // Show activity name and intro.
+    // Hiển thị tên hoạt động và phần giới thiệu.
     echo html_writer::tag('h2', format_string($ielts->name), ['class' => 'ielts-title mb-3']);
 
     if (!empty($ielts->intro)) {
         echo html_writer::div(format_module_intro('ielts', $ielts, $cm->id), 'ielts-intro mb-4');
     }
 
-    // If exam is not configured, show message.
+    // Nếu bài thi chưa được cấu hình, hiển thị thông báo.
     if (!$examConfigured) {
         echo $OUTPUT->notification(get_string('examnotconfigured', 'mod_ielts'), 'warning');
         echo $OUTPUT->footer();
         return;
     }
 
-    // Get user's attempts.
+    // Xử lý và lấy dữ liệu các lần làm bài của người dùng hiện tại.
     $attempts = $DB->get_records('ielts_attempts', [
         'ieltsid' => $ielts->id,
         'userid' => $USER->id,
     ], 'timecreated DESC');
 
-    // Display attempt summary.
+    // Hiển thị tóm tắt các lần làm bài.
     $attemptcount = count($attempts);
     $bestband = 0;
 
@@ -182,16 +165,16 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         }
     }
 
-    // Check if user can make more attempts.
+    // Kiểm tra xem người dùng có thể làm thêm lần thi hay không.
     $canmakeattempt = true;
-    $attemptsremaining = -1; // -1 means unlimited.
+    $attemptsremaining = -1; // -1 nghĩa là không giới hạn.
     
     if ($ielts->maxattempts > 0) {
         $attemptsremaining = $ielts->maxattempts - $attemptcount;
         $canmakeattempt = $attemptsremaining > 0;
     }
 
-    // Teacher grading link (if user has grade capability).
+    // Liên kết chấm điểm thủ công (nếu người dùng có quyền chấm điểm).
     if (has_capability('mod/ielts:grade', $context)) {
         $examdata = json_decode($ielts->content_json, true);
         $haswriting = !empty($examdata['writing']);
@@ -217,7 +200,7 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         }
     }
 
-    // Summary card.
+    // Card tóm tắt các lần làm bài.
     echo html_writer::start_div('card mb-4');
     echo html_writer::start_div('card-body');
     echo html_writer::tag('h5', get_string('yourattempts', 'mod_ielts'), ['class' => 'card-title']);
@@ -242,7 +225,7 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
             ['class' => 'btn btn-primary btn-lg']
         );
         
-        // Show attempts remaining if limited.
+        // Hiển thị số lần làm bài còn lại nếu có giới hạn.
         if ($attemptsremaining > 0) {
             echo html_writer::tag('div', 
                 get_string('attemptsremaining', 'mod_ielts', $attemptsremaining),
@@ -262,7 +245,7 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
     echo html_writer::end_div();
     echo html_writer::end_div();
 
-    // Attempt history table.
+    // Bảng lịch sử các lần làm bài.
     if ($attemptcount > 0) {
         echo html_writer::start_div('card');
         echo html_writer::start_div('card-body');
@@ -287,13 +270,13 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         foreach ($attempts as $attempt) {
             echo html_writer::start_tag('tr');
 
-            // Attempt number.
+            // Lần làm bài.
             echo html_writer::tag('td', $num);
 
-            // Date started.
+            // Ngày bắt đầu.
             echo html_writer::tag('td', userdate($attempt->timecreated, get_string('strftimedatetime', 'langconfig')));
 
-            // Date finished.
+            // Ngày kết thúc.
             if ($attempt->timefinished) {
                 echo html_writer::tag('td', userdate($attempt->timefinished, get_string('strftimedatetime', 'langconfig')));
             } else {
@@ -360,6 +343,6 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         echo html_writer::end_div();
     }
 
-    // Output page footer.
+    // In ra Footer của Moodle
     echo $OUTPUT->footer();
 }

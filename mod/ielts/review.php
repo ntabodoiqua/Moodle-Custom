@@ -1,65 +1,41 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
-
 /**
- * IELTS attempt review page.
- *
- * Displays the results of a completed attempt using React app.
- *
- * @package    mod_ielts
- * @copyright  2025 Your Name
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * Trang review attempt
  */
 
 require_once('../../config.php');
 require_once($CFG->dirroot . '/mod/ielts/lib.php');
 
-// Get parameters.
-$id = required_param('id', PARAM_INT); // Course Module ID.
+$id = required_param('id', PARAM_INT); // Course Module.
 $attemptid = required_param('attemptid', PARAM_INT);
 
-// Get course module and context.
+// query db lấy course module, course và instance của ielts
 $cm = get_coursemodule_from_id('ielts', $id, 0, false, MUST_EXIST);
 $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
 $ielts = $DB->get_record('ielts', ['id' => $cm->instance], '*', MUST_EXIST);
 
-// Require login.
 require_login($course, true, $cm);
 
-// Get context.
+// lấy context
 $context = context_module::instance($cm->id);
 
-// Check capability.
+// kiểm tra quyền với bài thi
 require_capability('mod/ielts:view', $context);
 
-// Get the attempt.
+// query db lấy attempt.
 $attempt = $DB->get_record('ielts_attempts', ['id' => $attemptid], '*', MUST_EXIST);
 
-// Verify the attempt belongs to this exam.
+// kiểm tra attempt là đúng của bài thi.
 if ($attempt->ieltsid != $ielts->id) {
     throw new moodle_exception('invalidattempt', 'mod_ielts');
 }
 
-// Check if user can view this attempt (own attempt or has grade capability).
+// kiểm tra xem người dùng có thể xem attempt này (là attempt của chính họ hoặc có quyền chấm điểm).
 if ($attempt->userid != $USER->id && !has_capability('mod/ielts:grade', $context)) {
     throw new moodle_exception('nopermission', 'mod_ielts');
 }
 
-// Prepare Moodle configuration for React app with review mode.
-// Parse score_data - can be either old format (just answers) or new format (detailed results)
+// chuẩn bị cấu hình Moodle cho ứng dụng React ở chế độ review.
 $scoredata = json_decode($attempt->score_data, true) ?: [];
 $answersdata = [];
 $scoringdata = null;
@@ -67,20 +43,20 @@ $questionresults = null;
 $writingessays = null;
 $speakingaudio = null;
 
-// Check if new detailed format
+// kiểm tra xem có phải định dạng chi tiết mới không
 if (isset($scoredata['answers'])) {
-    // New detailed format
+    // định dạng chi tiết mới
     $answersdata = $scoredata['answers'];
     $scoringdata = $scoredata['scoring'] ?? null;
     $questionresults = $scoredata['questionResults'] ?? null;
     $writingessays = $scoredata['writingEssays'] ?? null;
     $speakingaudio = $scoredata['speakingAudio'] ?? null;
 } else {
-    // Old format - score_data is just the answers object
+    // định dạng cũ - score_data chỉ là đối tượng answers
     $answersdata = $scoredata;
 }
 
-// Build grading info if teacher has graded Writing/Speaking
+// nếu có thông tin chấm điểm, chuẩn bị dữ liệu chấm điểm.
 $gradinginfo = null;
 if (property_exists($attempt, 'writing_band') || property_exists($attempt, 'speaking_band')) {
     $gradinginfo = [
@@ -102,7 +78,7 @@ $moodleconfig = [
     'cmId' => (int) $cm->id,
     'courseId' => (int) $course->id,
     'examName' => $ielts->name,
-    'canSubmit' => false, // Review mode - no submit.
+    'canSubmit' => false,
     'reviewMode' => true,
     'attemptId' => (int) $attemptid,
     'attemptData' => [
@@ -121,7 +97,7 @@ $moodleconfig = [
 
 $configjson = json_encode($moodleconfig, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
 
-// Find the correct asset files with hash in filename.
+// tìm file được tạo ra sau khi build React
 $mainjs = '';
 $maincss = '';
 $indexhtml = file_get_contents($CFG->dirroot . '/mod/ielts/build/index.html');
@@ -135,7 +111,7 @@ if (preg_match('/href="[^"]*\/assets\/(index-[^"]+\.css)"/', $indexhtml, $matche
 $cssurl = $maincss ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $maincss : '';
 $jsurl = $mainjs ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $mainjs : '';
 
-// Output raw HTML without Moodle's header/footer to avoid reactive component errors.
+// xuất trang HTML
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -144,7 +120,8 @@ $jsurl = $mainjs ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $mainjs : '';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo format_string($ielts->name); ?> - <?php echo get_string('review', 'mod_ielts'); ?></title>
     <?php if ($cssurl): ?>
-    <link rel="stylesheet" href="<?php echo $cssurl; ?>">
+    <!-- nhập css -->
+    <link rel="stylesheet" href="<?php echo $cssurl; ?>"> 
     <?php endif; ?>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -154,6 +131,7 @@ $jsurl = $mainjs ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $mainjs : '';
 <body>
     <script>window.MoodleConfig = <?php echo $configjson; ?>;</script>
     <div id="root" data-moodle-config="<?php echo htmlspecialchars($configjson, ENT_QUOTES); ?>"></div>
+    <!-- nhập js -->
     <?php if ($jsurl): ?>
     <script type="module" src="<?php echo $jsurl; ?>"></script>
     <?php endif; ?>
