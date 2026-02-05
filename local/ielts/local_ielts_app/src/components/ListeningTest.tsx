@@ -200,21 +200,6 @@ const ListeningTest = ({ answers, onAnswerChange }: ListeningTestProps) => {
               </div>
             </div>
           </div>
-
-          {/* Section Tabs */}
-          <div className={styles.sectionTabs}>
-            {sections.map((_, index) => (
-              <button
-                key={index}
-                className={`${styles.sectionTab} ${
-                  index === currentSectionIndex ? styles.activeTab : ""
-                }`}
-                onClick={() => setCurrentSectionIndex(index)}
-              >
-                Section {index + 1}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Right Panel - Questions */}

@@ -17,7 +17,7 @@ const WritingTest = ({ essays, onEssayChange }: WritingTestProps) => {
   const { examData } = useExamStore();
   const [activeTaskIndex, setActiveTaskIndex] = useState(0);
   const [localEssays, setLocalEssays] = useState<{ [taskId: number]: string }>(
-    {}
+    {},
   );
 
   // Get writing tasks from examData
@@ -251,6 +251,8 @@ const WritingTest = ({ essays, onEssayChange }: WritingTestProps) => {
                 className={`${styles.taskProgressItem} ${
                   index === activeTaskIndex ? styles.activeProgress : ""
                 }`}
+                onClick={() => setActiveTaskIndex(index)}
+                style={{ cursor: "pointer" }}
               >
                 <span className={styles.taskProgressLabel}>{task.title}:</span>
                 <span
