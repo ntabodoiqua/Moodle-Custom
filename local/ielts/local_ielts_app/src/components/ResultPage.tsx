@@ -1,5 +1,5 @@
 // src/components/ResultPage.tsx
-import { useState, useRef, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Button, Tooltip, message } from "antd";
 import {
   CheckCircleOutlined,
@@ -11,8 +11,6 @@ import {
   TrophyOutlined,
   PercentageOutlined,
   HomeOutlined,
-  PlayCircleOutlined,
-  PauseCircleOutlined,
   FileTextOutlined,
   KeyOutlined,
   AimOutlined,
@@ -95,10 +93,8 @@ const ResultPage = ({ config }: ResultPageProps) => {
   const [activeReviewTab, setActiveReviewTab] = useState<
     "reading" | "listening" | "writing" | "speaking"
   >(getFirstAvailableSkill());
-  const [playingAudio, setPlayingAudio] = useState<number | null>(null);
   const [activeReadingPart, setActiveReadingPart] = useState(0);
   const [activeListeningPart, setActiveListeningPart] = useState(0);
-  const audioRefs = useRef<{ [key: number]: HTMLAudioElement | null }>({});
 
   // Debug logging for review mode
   if (isReviewMode) {
@@ -353,24 +349,6 @@ const ResultPage = ({ config }: ResultPageProps) => {
 
   // Check if recordings exist for speaking
   const hasRecordings = Object.keys(speakingAudio).length > 0;
-
-  // Handle audio playback
-  const toggleAudioPlayback = (partId: number) => {
-    const audio = audioRefs.current[partId];
-    if (!audio) return;
-
-    if (playingAudio === partId) {
-      audio.pause();
-      setPlayingAudio(null);
-    } else {
-      // Pause any currently playing audio
-      if (playingAudio !== null && audioRefs.current[playingAudio]) {
-        audioRefs.current[playingAudio]?.pause();
-      }
-      audio.play();
-      setPlayingAudio(partId);
-    }
-  };
 
   // Handle back to overview (for review mode)
   const handleBackToOverview = () => {
@@ -1000,25 +978,10 @@ const ResultPage = ({ config }: ResultPageProps) => {
                   {audioUrl ? (
                     <div className={styles.audioPlayer}>
                       <audio
-                        ref={(el) => {
-                          audioRefs.current[partId] = el;
-                        }}
                         src={audioUrl}
-                        onEnded={() => setPlayingAudio(null)}
+                        controls
+                        style={{ width: "100%", maxWidth: "400px" }}
                       />
-                      <Button
-                        type="primary"
-                        shape="circle"
-                        icon={
-                          playingAudio === partId ? (
-                            <PauseCircleOutlined />
-                          ) : (
-                            <PlayCircleOutlined />
-                          )
-                        }
-                        onClick={() => toggleAudioPlayback(partId)}
-                      />
-                      <span>Click to play your recording</span>
                     </div>
                   ) : (
                     <div className={styles.noRecording}>

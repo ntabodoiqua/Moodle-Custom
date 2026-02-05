@@ -26,6 +26,8 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
   const [recordTime, setRecordTime] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -182,13 +184,17 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
   const stopRecording = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-    if (mediaRecorderRef.current && isRecording) {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       message.success("Recording saved!");
     }
-  }, [isRecording]);
+  }, []);
 
   // Play/Pause recorded audio
   const togglePlayback = () => {
@@ -391,7 +397,16 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
                 <audio
                   ref={audioRef}
                   src={audioUrl}
-                  onEnded={() => setIsPlaying(false)}
+                  onEnded={() => {
+                    setIsPlaying(false);
+                    setPlaybackTime(0);
+                  }}
+                  onLoadedMetadata={(e) => {
+                    setAudioDuration(e.currentTarget.duration);
+                  }}
+                  onTimeUpdate={(e) => {
+                    setPlaybackTime(e.currentTarget.currentTime);
+                  }}
                 />
                 <Button
                   type="primary"
@@ -401,9 +416,25 @@ const SpeakingTest = ({ recordings, onRecordingChange }: SpeakingTestProps) => {
                   onClick={togglePlayback}
                   className={styles.playButton}
                 />
-                <span className={styles.playbackLabel}>
-                  {isPlaying ? "Playing..." : "Click to play your recording"}
-                </span>
+                <div className={styles.playbackInfo}>
+                  <span className={styles.playbackLabel}>
+                    {isPlaying ? "Playing..." : "Click to play your recording"}
+                  </span>
+                  {audioDuration > 0 && (
+                    <div className={styles.playbackProgress}>
+                      <Progress
+                        percent={(playbackTime / audioDuration) * 100}
+                        size="small"
+                        showInfo={false}
+                        strokeColor="#3b82f6"
+                      />
+                      <span className={styles.playbackTimer}>
+                        {formatTime(Math.floor(playbackTime))} /{" "}
+                        {formatTime(Math.floor(audioDuration))}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
