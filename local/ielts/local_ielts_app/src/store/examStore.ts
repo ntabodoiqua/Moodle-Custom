@@ -15,6 +15,7 @@ import {
   uploadAudioFile,
   type DetailedResults,
 } from "../services/ieltsApi";
+import { checkAnswer } from "../utils/answerUtils";
 
 // Grading info from teacher
 interface GradingInfo {
@@ -419,9 +420,7 @@ function calculateDetailedScore(
             readingTotal++;
             const userAnswer = (answers[tq.id] || "").toString().trim();
             const correctAnswer = (tq.correctAnswer || "").toString().trim();
-            const isCorrect =
-              userAnswer.toLowerCase() === correctAnswer.toLowerCase() &&
-              userAnswer !== "";
+            const isCorrect = checkAnswer(userAnswer, correctAnswer);
 
             if (isCorrect) readingCorrect++;
 
@@ -440,9 +439,7 @@ function calculateDetailedScore(
             const correctAnswer = (question.correctAnswer || "")
               .toString()
               .trim();
-            const isCorrect =
-              userAnswer.toLowerCase() === correctAnswer.toLowerCase() &&
-              userAnswer !== "";
+            const isCorrect = checkAnswer(userAnswer, correctAnswer);
 
             if (isCorrect) readingCorrect++;
 
@@ -471,9 +468,7 @@ function calculateDetailedScore(
             listeningTotal++;
             const userAnswer = (answers[tq.id] || "").toString().trim();
             const correctAnswer = (tq.correctAnswer || "").toString().trim();
-            const isCorrect =
-              userAnswer.toLowerCase() === correctAnswer.toLowerCase() &&
-              userAnswer !== "";
+            const isCorrect = checkAnswer(userAnswer, correctAnswer);
 
             if (isCorrect) listeningCorrect++;
 
@@ -492,9 +487,7 @@ function calculateDetailedScore(
             const correctAnswer = (question.correctAnswer || "")
               .toString()
               .trim();
-            const isCorrect =
-              userAnswer.toLowerCase() === correctAnswer.toLowerCase() &&
-              userAnswer !== "";
+            const isCorrect = checkAnswer(userAnswer, correctAnswer);
 
             if (isCorrect) listeningCorrect++;
 

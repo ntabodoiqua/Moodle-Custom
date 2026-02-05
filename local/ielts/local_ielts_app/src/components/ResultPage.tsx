@@ -25,6 +25,7 @@ import { useExamStore } from "../store/examStore";
 import styles from "./ResultPage.module.css";
 import type { MoodleConfig } from "../types";
 import { hasSkillData } from "../types";
+import { checkAnswer } from "../utils/answerUtils";
 
 interface ResultPageProps {
   config?: MoodleConfig;
@@ -283,9 +284,9 @@ const ResultPage = ({ config }: ResultPageProps) => {
     readingQuestions.forEach((q) => {
       if (q.correctAnswer) {
         total++;
-        const userAns = (answers[q.id] || "").toString().trim().toLowerCase();
-        const correctAns = q.correctAnswer.toString().trim().toLowerCase();
-        if (userAns === correctAns) {
+        const userAns = (answers[q.id] || "").toString().trim();
+        const correctAns = q.correctAnswer.toString().trim();
+        if (checkAnswer(userAns, correctAns)) {
           correct++;
         }
       }
@@ -301,9 +302,9 @@ const ResultPage = ({ config }: ResultPageProps) => {
     listeningQuestions.forEach((q) => {
       if (q.correctAnswer) {
         total++;
-        const userAns = (answers[q.id] || "").toString().trim().toLowerCase();
-        const correctAns = q.correctAnswer.toString().trim().toLowerCase();
-        if (userAns === correctAns) {
+        const userAns = (answers[q.id] || "").toString().trim();
+        const correctAns = q.correctAnswer.toString().trim();
+        if (checkAnswer(userAns, correctAns)) {
           correct++;
         }
       }
@@ -443,9 +444,10 @@ const ResultPage = ({ config }: ResultPageProps) => {
                   const userAns = answers[q.id] || "";
                   const correctAns =
                     q.correctAnswer || answerKeyMap[q.id] || "N/A";
-                  const isCorrect =
-                    userAns.toString().trim().toLowerCase() ===
-                    correctAns.toString().trim().toLowerCase();
+                  const isCorrect = checkAnswer(
+                    userAns.toString().trim(),
+                    correctAns.toString().trim(),
+                  );
 
                   return (
                     <div key={q.id} className={styles.answerKeyItem}>
@@ -526,9 +528,10 @@ const ResultPage = ({ config }: ResultPageProps) => {
                   const userAns = answers[q.id] || "";
                   const correctAns =
                     q.correctAnswer || answerKeyMap[q.id] || "N/A";
-                  const isCorrect =
-                    userAns.toString().trim().toLowerCase() ===
-                    correctAns.toString().trim().toLowerCase();
+                  const isCorrect = checkAnswer(
+                    userAns.toString().trim(),
+                    correctAns.toString().trim(),
+                  );
 
                   return (
                     <div key={q.id} className={styles.reviewQuestion}>
@@ -731,9 +734,10 @@ const ResultPage = ({ config }: ResultPageProps) => {
                   const userAns = answers[q.id] || "";
                   const correctAns =
                     q.correctAnswer || answerKeyMap[q.id] || "N/A";
-                  const isCorrect =
-                    userAns.toString().trim().toLowerCase() ===
-                    correctAns.toString().trim().toLowerCase();
+                  const isCorrect = checkAnswer(
+                    userAns.toString().trim(),
+                    correctAns.toString().trim(),
+                  );
 
                   return (
                     <div key={q.id} className={styles.reviewQuestion}>

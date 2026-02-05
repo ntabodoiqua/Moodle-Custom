@@ -191,6 +191,35 @@
   z-index: 10;
 }
 
+.partTabs {
+  display: flex;
+  gap: 8px;
+}
+
+.partTab {
+  padding: 10px 20px;
+  border: 2px solid #d1d5db;
+  background-color: #ffffff;
+  color: #6b7280;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.partTab:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.partTab.activeTab {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
 .partLabel {
   font-weight: 700;
   color: #1f2937;
