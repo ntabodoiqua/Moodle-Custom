@@ -111,12 +111,8 @@ const QuestionRenderer = ({
         </Radio.Group>
       );
 
-    // Matching types - select from match items list
+    // Matching types - select from match items list (Gộp tất cả matching types)
     case "MATCHING":
-    case "MATCHING_HEADINGS":
-    case "MATCHING_INFORMATION":
-    case "MATCHING_FEATURES":
-    case "MATCHING_SENTENCE_ENDINGS":
       const matchOptions = matchItems || options || [];
       return (
         <Select
@@ -146,10 +142,8 @@ const QuestionRenderer = ({
         />
       );
 
-    // Text input types
-    case "GAP_FILL":
+    // Text input types (Gộp: SHORT_ANSWER, GAP_FILL, SUMMARY_COMPLETION)
     case "SHORT_ANSWER":
-    case "SUMMARY_COMPLETION":
     default:
       return (
         <Input

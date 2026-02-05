@@ -57,15 +57,15 @@ define([
     },
     { value: "TRUE_FALSE", label: "True/False/Not Given" },
     { value: "YES_NO", label: "Yes/No/Not Given" },
-    { value: "GAP_FILL", label: "Gap Fill / Sentence Completion" },
-    { value: "MATCHING", label: "Matching (General)" },
-    { value: "MATCHING_HEADINGS", label: "Matching Headings" },
-    { value: "MATCHING_INFORMATION", label: "Matching Information" },
-    { value: "MATCHING_FEATURES", label: "Matching Features" },
-    { value: "MATCHING_SENTENCE_ENDINGS", label: "Matching Sentence Endings" },
+    {
+      value: "SHORT_ANSWER",
+      label: "Short Answer / Gap Fill / Summary Completion",
+    },
+    {
+      value: "MATCHING",
+      label: "Matching (All Types: Headings, Information, Features, Endings)",
+    },
     { value: "MAP_LABELING", label: "Map/Diagram Labeling" },
-    { value: "SHORT_ANSWER", label: "Short Answer" },
-    { value: "SUMMARY_COMPLETION", label: "Summary Completion" },
   ];
 
   // Group types for question groups
@@ -1155,16 +1155,10 @@ define([
       case "YES_NO":
         question.options = ["YES", "NO", "NOT GIVEN"];
         break;
-      case "MATCHING_HEADINGS":
-      case "MATCHING_INFORMATION":
-      case "MATCHING_FEATURES":
-      case "MATCHING_SENTENCE_ENDINGS":
       case "MATCHING":
         question.matchItems = question.matchItems || ["", "", "", ""];
         break;
-      case "GAP_FILL":
       case "SHORT_ANSWER":
-      case "SUMMARY_COMPLETION":
       case "MAP_LABELING":
       default:
         question.options = [];
@@ -1187,40 +1181,14 @@ define([
       case "MULTIPLE_CHOICE_MULTI":
         return renderMultipleAnswerEditor(question);
 
-      case "MATCHING_HEADINGS":
-        return renderMatchingEditor(
-          question,
-          "Heading",
-          "Enter heading options that can be matched to paragraphs",
-        );
-
-      case "MATCHING_INFORMATION":
-        return renderMatchingEditor(
-          question,
-          "Paragraph",
-          "Enter paragraph labels (A, B, C...) or descriptions",
-        );
-
-      case "MATCHING_FEATURES":
-        return renderMatchingEditor(
-          question,
-          "Feature/Person",
-          "Enter names or features to match",
-        );
-
-      case "MATCHING_SENTENCE_ENDINGS":
-        return renderMatchingEditor(
-          question,
-          "Ending",
-          "Enter sentence endings to match",
-        );
-
       case "MATCHING":
-        return renderMatchingEditor(question, "Item", "Enter items to match");
+        return renderMatchingEditor(
+          question,
+          "Item",
+          "Enter items to match (headings, information, features, endings, etc.)",
+        );
 
-      case "GAP_FILL":
       case "SHORT_ANSWER":
-      case "SUMMARY_COMPLETION":
       case "MAP_LABELING":
       default:
         return renderSimpleAnswerHint(question);
@@ -1691,11 +1659,8 @@ define([
    */
   function renderSimpleAnswerHint(question) {
     const hints = {
-      GAP_FILL:
-        "Enter the exact word(s) that fill the gap. For multiple acceptable answers, separate with | (e.g., 'answer1|answer2')",
       SHORT_ANSWER:
-        "Enter the correct short answer. For multiple acceptable answers, separate with | (e.g., 'yes|correct')",
-      SUMMARY_COMPLETION: "Enter the word(s) that complete the summary",
+        "Enter the correct answer. For multiple acceptable answers, separate with | (e.g., 'answer1|answer2')",
       MAP_LABELING: "Enter the correct label/letter for this location",
     };
 
@@ -2541,13 +2506,7 @@ define([
           }
 
           // Match items for matching types
-          if (
-            type === "MATCHING" ||
-            type === "MATCHING_HEADINGS" ||
-            type === "MATCHING_INFORMATION" ||
-            type === "MATCHING_FEATURES" ||
-            type === "MATCHING_SENTENCE_ENDINGS"
-          ) {
+          if (type === "MATCHING") {
             question.matchItems = [];
             questionEl.find(".match-item-input").each(function () {
               question.matchItems.push($(this).val());
