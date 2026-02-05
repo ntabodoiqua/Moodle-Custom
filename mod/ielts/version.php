@@ -3,7 +3,7 @@
  * Thông tin phiên bản của Module IELTS.
  */
 
-// Không cho phép truy cập trực tiếp từ trình duyệt.
+// không cho phép truy cập trực tiếp từ trình duyệt.
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'mod_ielts';

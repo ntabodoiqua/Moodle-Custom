@@ -1,35 +1,12 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
-
 /**
- * Library of functions and constants for mod_ielts.
- *
- * @package    mod_ielts
- * @copyright  2025 Your Name
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * Thư viện chức năng cho module IELTS.
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-/**
- * Returns the information on whether the module supports a feature.
- *
- * @param string $feature FEATURE_xx constant for requested feature
- * @return mixed True if module supports feature, false if not, null if doesn't know or string for the module purpose.
- */
+
+// Trả về thông tin về việc module có hỗ trợ một tính năng hay không.
 function ielts_supports($feature) {
     switch ($feature) {
         case FEATURE_MOD_INTRO:
@@ -61,18 +38,7 @@ function ielts_supports($feature) {
     }
 }
 
-/**
- * Adds a new IELTS activity instance.
- *
- * Given an object containing all the necessary data,
- * (defined by the form in mod_form.php) this function
- * will create a new instance and return the id number
- * of the new instance.
- *
- * @param stdClass $ielts An object from the form in mod_form.php
- * @param mod_ielts_mod_form $mform The form instance
- * @return int The id of the newly inserted ielts record
- */
+// Thêm một instance mới của activity IELTS.
 function ielts_add_instance($ielts, $mform = null) {
     global $DB;
 
@@ -93,17 +59,8 @@ function ielts_add_instance($ielts, $mform = null) {
     return $ielts->id;
 }
 
-/**
- * Updates an existing IELTS activity instance.
- *
- * Given an object containing all the necessary data,
- * (defined by the form in mod_form.php) this function
- * will update an existing instance with new data.
- *
- * @param stdClass $ielts An object from the form in mod_form.php
- * @param mod_ielts_mod_form $mform The form instance
- * @return bool True on success
- */
+// cập nhật một instance IELTS đã tồn tại.
+
 function ielts_update_instance($ielts, $mform = null) {
     global $DB;
 
@@ -119,16 +76,7 @@ function ielts_update_instance($ielts, $mform = null) {
     return $result;
 }
 
-/**
- * Deletes an IELTS activity instance.
- *
- * Given an ID of an instance of this module,
- * this function will permanently delete the instance
- * and any data that depends on it.
- *
- * @param int $id Id of the module instance
- * @return bool True on success
- */
+// Xoá một instance của activity IELTS.
 function ielts_delete_instance($id) {
     global $DB;
 
@@ -148,18 +96,7 @@ function ielts_delete_instance($id) {
     return true;
 }
 
-/**
- * Returns a small object with summary information about what a
- * user has done with a given particular instance of this module.
- *
- * Used for user activity reports.
- *
- * @param stdClass $course The course record
- * @param stdClass $user The user record
- * @param cm_info|stdClass $mod The course module info object or record
- * @param stdClass $ielts The ielts instance record
- * @return stdClass|null A standard object with info or null
- */
+// trả về thông tin tóm tắt về những gì người dùng đã làm với một instance cụ thể của module này.
 function ielts_user_outline($course, $user, $mod, $ielts) {
     global $DB;
 
@@ -182,15 +119,7 @@ function ielts_user_outline($course, $user, $mod, $ielts) {
     return $result;
 }
 
-/**
- * Prints a detailed representation of what a user has done with
- * a given particular instance of this module.
- *
- * @param stdClass $course The course record
- * @param stdClass $user The user record
- * @param cm_info|stdClass $mod The course module info object or record
- * @param stdClass $ielts The ielts instance record
- */
+// in ra một bản chi tiết về những gì người dùng đã làm với một instance cụ thể của module này.
 function ielts_user_complete($course, $user, $mod, $ielts) {
     global $DB, $OUTPUT;
 
@@ -225,12 +154,7 @@ function ielts_user_complete($course, $user, $mod, $ielts) {
 }
 
 /**
- * Given a course_module object, this function returns any
- * "extra" information that may be needed when printing
- * this activity in a course listing.
- *
- * @param cm_info $coursemodule The coursemodule object
- * @return cached_cm_info|null Info to customise main page display
+ * lấy thông tin course module cho ielts.
  */
 function ielts_get_coursemodule_info($coursemodule) {
     global $DB;
@@ -252,18 +176,7 @@ function ielts_get_coursemodule_info($coursemodule) {
     return $info;
 }
 
-// ============================================================
-// GRADEBOOK FUNCTIONS
-// ============================================================
-
-/**
- * Create/update grade item for given IELTS activity.
- *
- * @category grade
- * @param stdClass $ielts The ielts instance
- * @param mixed $grades Optional array/object of grade(s); 'reset' means reset grades in gradebook
- * @return int 0 if ok, error code otherwise
- */
+// tao hoặc cập nhật mục đánh giá cho activity IELTS đã cho.
 function ielts_grade_item_update($ielts, $grades = null) {
     global $CFG;
     require_once($CFG->libdir . '/gradelib.php');
@@ -304,13 +217,7 @@ function ielts_grade_item_update($ielts, $grades = null) {
     );
 }
 
-/**
- * Delete grade item for given IELTS activity.
- *
- * @category grade
- * @param stdClass $ielts The ielts instance
- * @return int 0 if ok, error code otherwise
- */
+// Xoá mục đánh giá cho activity IELTS đã cho.
 function ielts_grade_item_delete($ielts) {
     global $CFG;
     require_once($CFG->libdir . '/gradelib.php');
@@ -328,12 +235,7 @@ function ielts_grade_item_delete($ielts) {
 }
 
 /**
- * Update grades in the gradebook.
- *
- * @category grade
- * @param stdClass $ielts The ielts instance
- * @param int $userid Specific user only, 0 means all users
- * @param bool $nullifnone If true and user has no grade, a null grade is inserted
+ * Cập nhật điểm cho người dùng cụ thể hoặc tất cả người dùng.
  */
 function ielts_update_grades($ielts, $userid = 0, $nullifnone = true) {
     global $CFG, $DB;
@@ -352,13 +254,8 @@ function ielts_update_grades($ielts, $userid = 0, $nullifnone = true) {
 }
 
 /**
- * Get user grades for a specific IELTS activity.
- *
- * Returns the highest band score from user's attempts.
- *
- * @param stdClass $ielts The ielts instance
- * @param int $userid Specific user id, 0 for all users
- * @return array Array of grade objects indexed by userid
+ * Lấy điểm của người dùng cho một hoạt động IELTS cụ thể.
+ * Trả về điểm cao nhất từ các lần thử của người dùng.
  */
 function ielts_get_user_grades($ielts, $userid = 0) {
     global $DB;
@@ -373,7 +270,7 @@ function ielts_get_user_grades($ielts, $userid = 0) {
         $userwhere = 'AND userid = :userid';
     }
 
-    // Get best (highest) band score for each user.
+    // Lấy điểm cao nhấtcho mỗi người dùng.
     $sql = "SELECT userid, MAX(final_band) as rawgrade, MAX(timefinished) as datesubmitted
               FROM {ielts_attempts}
              WHERE ieltsid = :ieltsid
@@ -394,14 +291,7 @@ function ielts_get_user_grades($ielts, $userid = 0) {
     return $grades;
 }
 
-/**
- * Rescale all grades for this activity and push the new grades to the gradebook.
- *
- * @param stdClass $ielts The ielts instance
- * @param float $oldgrade Old maximum grade
- * @param float $newgrade New maximum grade
- * @return bool True on success
- */
+// tính toán lại điểm khi thay đổi thang điểm của activity.
 function ielts_rescale_activity_grades($ielts, $oldgrade, $newgrade) {
     global $DB;
 
@@ -424,21 +314,8 @@ function ielts_rescale_activity_grades($ielts, $oldgrade, $newgrade) {
     return true;
 }
 
-// ============================================================
-// FILE HANDLING (for intro)
-// ============================================================
-
 /**
- * Serves the files from the ielts file areas.
- *
- * @param stdClass $course The course object
- * @param stdClass $cm The course module object
- * @param context $context The context
- * @param string $filearea The file area
- * @param array $args Extra arguments
- * @param bool $forcedownload Whether or not force download
- * @param array $options Additional options affecting the file serving
- * @return bool False if file not found, does not return if found - just sends the file
+ * phục vụ các file từ các khu vực tệp của module IELTS.
  */
 function ielts_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
     if ($context->contextlevel != CONTEXT_MODULE) {
@@ -463,19 +340,8 @@ function ielts_pluginfile($course, $cm, $context, $filearea, $args, $forcedownlo
     send_stored_file($file, 0, 0, $forcedownload, $options);
 }
 
-// ============================================================
-// COMPLETION FUNCTIONS
-// ============================================================
-
 /**
- * Obtains the automatic completion state for this ielts based on any conditions
- * in ielts settings.
- *
- * @param stdClass $course Course record
- * @param cm_info|stdClass $cm Course-module record
- * @param int $userid User ID
- * @param bool $type Type of comparison (or/and; can be used as return value if no conditions)
- * @return bool True if completed, false if not
+ * lấy trạng thái hoàn thành của người dùng cho activity IELTS cụ thể.
  */
 function ielts_get_completion_state($course, $cm, $userid, $type) {
     global $DB;
@@ -528,12 +394,7 @@ function ielts_get_completion_state($course, $cm, $userid, $type) {
 }
 
 /**
- * Check if completion is enabled for this activity and that there are
- * custom completion rules.
- *
- * @param cm_info|stdClass $cm course-module
- * @return bool True if completion is enabled and there are custom completion rules,
- *   false otherwise.
+ * Lấy mô tả các quy tắc hoàn thành đang hoạt động cho activity IELTS cụ thể.
  */
 function ielts_completion_get_active_rule_descriptions($cm) {
     if (empty($cm->customdata['customcompletionrules']) || $cm->completion != COMPLETION_TRACKING_AUTOMATIC) {
@@ -561,17 +422,9 @@ function ielts_completion_get_active_rule_descriptions($cm) {
     return $descriptions;
 }
 
-// ============================================================
-// VIEW TRACKING
-// ============================================================
 
 /**
- * Mark the activity as viewed and trigger the course_module_viewed event.
- *
- * @param stdClass $ielts The ielts instance
- * @param stdClass $course The course object
- * @param cm_info|stdClass $cm The course module info object
- * @param context_module $context The context
+ * Đánh dấu hoạt động đã được xem và kích hoạt sự kiện course_module_viewed.
  */
 function ielts_view($ielts, $course, $cm, $context) {
     // Trigger course_module_viewed event.
@@ -591,24 +444,15 @@ function ielts_view($ielts, $course, $cm, $context) {
     $completion->set_module_viewed($cm);
 }
 
-// ============================================================
-// RECENT ACTIVITY
-// ============================================================
-
 /**
- * Returns all other caps used in the module.
- *
- * @return array Array of capabilities
+ * Trả về tất cả các quyền khác được sử dụng trong module.
  */
 function ielts_get_extra_capabilities() {
     return ['moodle/site:accessallgroups'];
 }
 
 /**
- * Implementation of the function for printing the form elements that control
- * whether the course reset functionality affects the ielts.
- *
- * @param MoodleQuickForm $mform The form object
+ * triển khai 
  */
 function ielts_reset_course_form_definition(&$mform) {
     $mform->addElement('header', 'ieltsheader', get_string('modulenameplural', 'mod_ielts'));

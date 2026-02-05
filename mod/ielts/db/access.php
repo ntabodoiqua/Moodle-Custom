@@ -1,32 +1,14 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Capability definitions for mod_ielts.
- *
- * @package    mod_ielts
- * @copyright  2025 Your Name
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * Định nghĩa các quyền cho module IELTS.
  */
 
 defined('MOODLE_INTERNAL') || die();
 
 $capabilities = [
 
-    // Ability to add a new IELTS activity instance.
+    // Khả năng thêm một instance hoạt động IELTS mới.
     'mod/ielts:addinstance' => [
         'riskbitmask' => RISK_XSS,
         'captype' => 'write',
@@ -38,7 +20,7 @@ $capabilities = [
         'clonepermissionsfrom' => 'moodle/course:manageactivities',
     ],
 
-    // Ability to view the IELTS activity.
+    // Khả năng xem hoạt động IELTS.
     'mod/ielts:view' => [
         'captype' => 'read',
         'contextlevel' => CONTEXT_MODULE,
@@ -51,7 +33,7 @@ $capabilities = [
         ],
     ],
 
-    // Ability to submit an attempt.
+    // Khả năng nộp bài thi.
     'mod/ielts:submit' => [
         'riskbitmask' => RISK_SPAM,
         'captype' => 'write',
@@ -61,7 +43,7 @@ $capabilities = [
         ],
     ],
 
-    // Ability to view reports of all attempts.
+    // Khả năng xem báo cáo của tất cả các bài thi.
     'mod/ielts:viewreports' => [
         'riskbitmask' => RISK_PERSONAL,
         'captype' => 'read',
@@ -73,7 +55,7 @@ $capabilities = [
         ],
     ],
 
-    // Ability to grade attempts.
+    // Khả năng chấm điểm các bài thi.
     'mod/ielts:grade' => [
         'riskbitmask' => RISK_XSS,
         'captype' => 'write',

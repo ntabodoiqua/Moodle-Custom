@@ -1,60 +1,38 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
-
 /**
- * IELTS activity add/edit form.
- *
- * @package    mod_ielts
- * @copyright  2025 Your Name
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * Form thêm mới/edit của IELTS.
  */
 
 defined('MOODLE_INTERNAL') || die();
 
+// thư viện form moodle mặc định
 require_once($CFG->dirroot . '/course/moodleform_mod.php');
 
 /**
- * Module settings form for IELTS activity.
+ * Form cài đặt module cho activity IELTS.
  */
 class mod_ielts_mod_form extends moodleform_mod {
 
-    /**
-     * Define the form elements.
-     */
+    // định nghĩa các elements của form
     public function definition() {
         global $CFG, $PAGE;
 
         $mform = $this->_form;
 
-        // Load JavaScript for dynamic form builder.
+        // tích hợp exambuilder để xây dựng đề thi trực quan cho GV
         $PAGE->requires->js_call_amd('mod_ielts/exambuilder', 'init');
         $PAGE->requires->css('/mod/ielts/styles.css');
 
-        // Load Quill WYSIWYG editor from CDN (no jQuery dependency).
+        // trình soạn thảo Quill WYSIWYG
         $mform->addElement('html', '
         <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
         ');
 
-        // -------------------------------------------------------
-        // General section.
-        // -------------------------------------------------------
+        // cài đặt chung
         $mform->addElement('header', 'general', get_string('general', 'form'));
 
-        // Activity name.
+        // tên activity.
         $mform->addElement('text', 'name', get_string('ieltsname', 'mod_ielts'), ['size' => '64']);
         if (!empty($CFG->formatstringstriptags)) {
             $mform->setType('name', PARAM_TEXT);
@@ -65,12 +43,10 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->addRule('name', get_string('maximumchars', '', 255), 'maxlength', 255, 'client');
         $mform->addHelpButton('name', 'ieltsname', 'mod_ielts');
 
-        // Standard intro elements (description).
+        // mô tả activity.
         $this->standard_intro_elements();
 
-        // -------------------------------------------------------
-        // Input method selector.
-        // -------------------------------------------------------
+        // dropdown chọn phương thức nhập đề thi.
         $mform->addElement('header', 'inputmethodsection', get_string('inputmethod', 'mod_ielts'));
         $mform->setExpanded('inputmethodsection', true);
 
@@ -82,16 +58,14 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->setDefault('inputmethod', 'builder');
         $mform->addHelpButton('inputmethod', 'inputmethod', 'mod_ielts');
 
-        // -------------------------------------------------------
-        // VISUAL BUILDER SECTION
-        // -------------------------------------------------------
+        // phần visual exam builder
         $mform->addElement('header', 'buildersection', get_string('exambuilder', 'mod_ielts'));
         $mform->setExpanded('buildersection', true);
 
-        // Skills selector with checkboxes.
+        // selector kỹ năng với checkbox.
         $mform->addElement('html', '<div id="ielts-exam-builder" class="ielts-builder-container">');
 
-        // Skill selection.
+        // chọn kỹ năng.
         $mform->addElement('html', '<div class="ielts-skills-selector card p-3 mb-3">');
         $mform->addElement('html', '<h5 class="mb-3">' . get_string('selectskills', 'mod_ielts') . '</h5>');
         $mform->addElement('html', '<div class="d-flex flex-wrap gap-3">');
@@ -107,49 +81,45 @@ class mod_ielts_mod_form extends moodleform_mod {
 
         $mform->addElement('html', '</div></div>');
 
-        // Duration settings.
+        // cài đặt thời lượng.
         $mform->addElement('html', '<div class="ielts-duration-settings card p-3 mb-3">');
         $mform->addElement('html', '<h5 class="mb-3">' . get_string('skillduration', 'mod_ielts') . '</h5>');
         $mform->addElement('html', '<div class="duration-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">');
 
-        // Reading duration.
+        // Reading.
         $mform->addElement('html', '<div class="duration-item" id="duration_reading_wrapper" style="display: flex; flex-direction: column;">');
         $mform->addElement('html', '<label for="id_duration_reading" style="white-space: nowrap; margin-bottom: 5px;">' . 
             get_string('duration_reading', 'mod_ielts') . '</label>');
         $mform->addElement('html', '<input type="number" name="duration_reading" id="id_duration_reading" value="60" class="form-control" style="width: 80px;">');
         $mform->addElement('html', '</div>');
 
-        // Listening duration.
+        // Listening.
         $mform->addElement('html', '<div class="duration-item" id="duration_listening_wrapper" style="display: flex; flex-direction: column;">');
         $mform->addElement('html', '<label for="id_duration_listening" style="white-space: nowrap; margin-bottom: 5px;">' . 
             get_string('duration_listening', 'mod_ielts') . '</label>');
         $mform->addElement('html', '<input type="number" name="duration_listening" id="id_duration_listening" value="40" class="form-control" style="width: 80px;">');
         $mform->addElement('html', '</div>');
 
-        // Writing duration.
+        // Writing.
         $mform->addElement('html', '<div class="duration-item" id="duration_writing_wrapper" style="display: flex; flex-direction: column;">');
         $mform->addElement('html', '<label for="id_duration_writing" style="white-space: nowrap; margin-bottom: 5px;">' . 
             get_string('duration_writing', 'mod_ielts') . '</label>');
         $mform->addElement('html', '<input type="number" name="duration_writing" id="id_duration_writing" value="60" class="form-control" style="width: 80px;">');
         $mform->addElement('html', '</div>');
 
-        // Speaking duration.
+        // Speaking.
         $mform->addElement('html', '<div class="duration-item" id="duration_speaking_wrapper" style="display: flex; flex-direction: column;">');
         $mform->addElement('html', '<label for="id_duration_speaking" style="white-space: nowrap; margin-bottom: 5px;">' . 
             get_string('duration_speaking', 'mod_ielts') . '</label>');
         $mform->addElement('html', '<input type="number" name="duration_speaking" id="id_duration_speaking" value="15" class="form-control" style="width: 80px;">');
         $mform->addElement('html', '</div>');
 
-        $mform->addElement('html', '</div></div>'); // End duration settings.
+        $mform->addElement('html', '</div></div>');
 
-        // -------------------------------------------------------
-        // QUESTION NUMBERING SUMMARY
-        // -------------------------------------------------------
+        // tóm tắt số câu hỏi.
         $mform->addElement('html', '<div id="question-numbering-summary"></div>');
 
-        // -------------------------------------------------------
-        // READING SECTION
-        // -------------------------------------------------------
+        // phần reading
         $mform->addElement('html', '<div id="reading-section" class="ielts-skill-section card p-3 mb-3" style="display:none;">');
         $mform->addElement('html', '<h4 class="text-primary"><i class="fa fa-book"></i> ' .
             get_string('skill_reading', 'mod_ielts') . '</h4>');
@@ -159,9 +129,7 @@ class mod_ielts_mod_form extends moodleform_mod {
             '<i class="fa fa-plus"></i> ' . get_string('addpassage', 'mod_ielts') . '</button>');
         $mform->addElement('html', '</div>');
 
-        // -------------------------------------------------------
-        // LISTENING SECTION
-        // -------------------------------------------------------
+        // phần listening
         $mform->addElement('html', '<div id="listening-section" class="ielts-skill-section card p-3 mb-3" style="display:none;">');
         $mform->addElement('html', '<h4 class="text-success"><i class="fa fa-headphones"></i> ' .
             get_string('skill_listening', 'mod_ielts') . '</h4>');
@@ -171,9 +139,7 @@ class mod_ielts_mod_form extends moodleform_mod {
             '<i class="fa fa-plus"></i> ' . get_string('addlisteningsection', 'mod_ielts') . '</button>');
         $mform->addElement('html', '</div>');
 
-        // -------------------------------------------------------
-        // WRITING SECTION
-        // -------------------------------------------------------
+        // phần writing
         $mform->addElement('html', '<div id="writing-section" class="ielts-skill-section card p-3 mb-3" style="display:none;">');
         $mform->addElement('html', '<h4 class="text-warning"><i class="fa fa-pencil"></i> ' .
             get_string('skill_writing', 'mod_ielts') . '</h4>');
@@ -183,9 +149,7 @@ class mod_ielts_mod_form extends moodleform_mod {
             '<i class="fa fa-plus"></i> ' . get_string('addwritingtask', 'mod_ielts') . '</button>');
         $mform->addElement('html', '</div>');
 
-        // -------------------------------------------------------
-        // SPEAKING SECTION
-        // -------------------------------------------------------
+        // phần speaking
         $mform->addElement('html', '<div id="speaking-section" class="ielts-skill-section card p-3 mb-3" style="display:none;">');
         $mform->addElement('html', '<h4 class="text-danger"><i class="fa fa-microphone"></i> ' .
             get_string('skill_speaking', 'mod_ielts') . '</h4>');
@@ -195,11 +159,9 @@ class mod_ielts_mod_form extends moodleform_mod {
             '<i class="fa fa-plus"></i> ' . get_string('addspeakingpart', 'mod_ielts') . '</button>');
         $mform->addElement('html', '</div>');
 
-        $mform->addElement('html', '</div>'); // End #ielts-exam-builder.
+        $mform->addElement('html', '</div>');
 
-        // -------------------------------------------------------
-        // JSON INPUT SECTION (Alternative / Advanced)
-        // -------------------------------------------------------
+        // phần nhập liệu JSON (nâng cao)
         $mform->addElement('header', 'jsonsection', get_string('jsoninput', 'mod_ielts'));
 
         $mform->addElement('html', '<p class="text-muted">' . get_string('jsoninput_help', 'mod_ielts') . '</p>');
@@ -213,13 +175,11 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->setType('content_json', PARAM_RAW);
         $mform->addHelpButton('content_json', 'content_json', 'mod_ielts');
 
-        // Hidden field to store final JSON from builder.
+        // nhận dạng JSON từ visual builder để lưu trữ.
         $mform->addElement('hidden', 'builder_json', '', ['id' => 'id_builder_json']);
         $mform->setType('builder_json', PARAM_RAW);
 
-        // -------------------------------------------------------
-        // Grade section.
-        // -------------------------------------------------------
+        // phần điểm số.
         $mform->addElement('header', 'gradesection', get_string('gradesection', 'mod_ielts'));
 
         $mform->addElement('text', 'grade', get_string('grademax', 'mod_ielts'), ['size' => '4']);
@@ -227,9 +187,7 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->setDefault('grade', 9);
         $mform->addRule('grade', null, 'numeric', null, 'client');
 
-        // -------------------------------------------------------
-        // Attempt settings.
-        // -------------------------------------------------------
+        // phần cài đặt số lần làm bài.
         $mform->addElement('header', 'attemptsheader', get_string('attemptsettings', 'mod_ielts'));
         
         $attemptoptions = [
@@ -245,26 +203,19 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->setDefault('maxattempts', 0);
         $mform->addHelpButton('maxattempts', 'maxattempts', 'mod_ielts');
 
-        // -------------------------------------------------------
-        // Standard course module elements.
-        // -------------------------------------------------------
+        // phần cài đặt module chuẩn của khóa học.
         $this->standard_coursemodule_elements();
 
-        // -------------------------------------------------------
-        // Action buttons.
-        // -------------------------------------------------------
+        // các nút lưu mặc định của moodle.
         $this->add_action_buttons();
     }
 
-    /**
-     * Add any custom completion rules to the form.
-     *
-     * @return array List of added completion elements.
-     */
+    
+    // các điều kiện hoàn thành tùy chỉnh
     public function add_completion_rules() {
         $mform =& $this->_form;
 
-        // Completion on submission.
+        // hoàn thành khi nộp bài.
         $group = [];
         $group[] =& $mform->createElement('checkbox', 'completionsubmit', '', 
             get_string('completionsubmit', 'mod_ielts'));
@@ -273,20 +224,24 @@ class mod_ielts_mod_form extends moodleform_mod {
         $mform->addHelpButton('completionsubmitgroup', 'completionsubmit', 'mod_ielts');
         $mform->hideIf('completionsubmitgroup', 'completion', 'ne', COMPLETION_TRACKING_AUTOMATIC);
 
-        // Completion on minimum grade.
+        // hoàn thành khi đạt điểm tối thiểu.
         $group = [];
         $group[] =& $mform->createElement('checkbox', 'completionusegrade', '',
             get_string('completionusegrade', 'mod_ielts'));
+        $group[] =& $mform->createElement('static', 'completionmingrade_label', '', 
+            get_string('minimumband', 'mod_ielts') . ': ');
         $group[] =& $mform->createElement('text', 'completionmingrade', '',
-            ['size' => '3', 'optional' => true]);
+            ['size' => '4', 'placeholder' => '5.5']);
         $mform->setType('completionmingrade', PARAM_FLOAT);
         $mform->addGroup($group, 'completionmingradegroup',
-            get_string('completionmingradegroup', 'mod_ielts'), [' '], false);
+            get_string('completionmingradegroup', 'mod_ielts'), ' ', false);
+        $mform->setDefault('completionmingrade', '5.5');
         $mform->addHelpButton('completionmingradegroup', 'completionmingrade', 'mod_ielts');
         $mform->hideIf('completionmingradegroup', 'completion', 'ne', COMPLETION_TRACKING_AUTOMATIC);
         $mform->hideIf('completionmingrade', 'completionusegrade', 'notchecked');
+        $mform->hideIf('completionmingrade_label', 'completionusegrade', 'notchecked');
 
-        // Completion on pass grade.
+        // hoàn thành khi đạt điểm đỗ.
         $group = [];
         $group[] =& $mform->createElement('checkbox', 'completionpassgrade', '',
             get_string('completionpassgrade', 'mod_ielts'));
@@ -298,32 +253,19 @@ class mod_ielts_mod_form extends moodleform_mod {
         return ['completionsubmitgroup', 'completionmingradegroup', 'completionpassgradegroup'];
     }
 
-    /**
-     * Called during validation to see whether the custom completion rules are enabled.
-     *
-     * @param array $data Input data not yet validated.
-     * @return bool True if one or more rules is enabled, false if none are.
-     */
+    // hàm kiểm tra các quy tắc hoàn thành cho moodle.
     public function completion_rule_enabled($data) {
         return (!empty($data['completionsubmit']) ||
                 !empty($data['completionusegrade']) ||
                 !empty($data['completionpassgrade']));
     }
 
-    /**
-     * Allows module to modify the data returned by form->get_data().
-     * This method is also called in the bulk activity completion form.
-     *
-     * Only available on moodleform_mod.
-     *
-     * @param stdClass $data the form data to be modified.
-     */
+    // dọn dẹp dữ liệu sau khi submit và trước khi lưu.
     public function data_postprocessing($data) {
         parent::data_postprocessing($data);
         
-        // Set up completion checkboxes which aren't part of standard data.
         if (!empty($data->completionunlocked)) {
-            // Turn off completion settings if the checkboxes aren't ticked.
+            // tắt các tùy chọn hoàn thành nếu hoàn thành không được theo dõi.
             $autocompletion = !empty($data->completion) && $data->completion == COMPLETION_TRACKING_AUTOMATIC;
             
             if (!$autocompletion || empty($data->completionsubmit)) {
@@ -341,16 +283,12 @@ class mod_ielts_mod_form extends moodleform_mod {
     }
 
     /**
-     * Validate the form data.
-     *
-     * @param array $data Form data
-     * @param array $files Uploaded files
-     * @return array Validation errors
+     * Validate dữ liệu form.
      */
     public function validation($data, $files) {
         $errors = parent::validation($data, $files);
 
-        // Get the actual JSON content based on input method.
+        // lấy nội dung json từ builder hoặc textarea.
         $jsonContent = '';
         if (isset($data['inputmethod']) && $data['inputmethod'] === 'builder' && !empty($data['builder_json'])) {
             $jsonContent = $data['builder_json'];
@@ -358,7 +296,7 @@ class mod_ielts_mod_form extends moodleform_mod {
             $jsonContent = $data['content_json'];
         }
 
-        // Validate JSON format if content is provided.
+        // validate json
         if (!empty($jsonContent)) {
             $decoded = json_decode($jsonContent, true);
             if (json_last_error() !== JSON_ERROR_NONE) {
@@ -367,7 +305,7 @@ class mod_ielts_mod_form extends moodleform_mod {
             }
         }
 
-        // Validate grade is positive.
+        // Validate grade là số dương.
         if (isset($data['grade']) && $data['grade'] < 0) {
             $errors['grade'] = get_string('grademax', 'mod_ielts') . ' must be positive';
         }
@@ -375,11 +313,9 @@ class mod_ielts_mod_form extends moodleform_mod {
         return $errors;
     }
 
-    /**
-     * Preprocess form data before displaying.
-     *
-     * @param array $defaultvalues Default values for the form
-     */
+    
+    // tiền xử lý dữ liệu trước khi hiển thị.
+    // nếu bài thi đã có dữ liệu, phân tích json để điền các trường builder.
     public function data_preprocessing(&$defaultvalues) {
         parent::data_preprocessing($defaultvalues);
 
@@ -388,16 +324,16 @@ class mod_ielts_mod_form extends moodleform_mod {
             $examData = json_decode($defaultvalues['content_json'], true);
 
             if ($examData !== null) {
-                // Pretty print JSON for the textarea.
+                // định dạng lại json đẹp để hiển thị trong textarea.
                 $defaultvalues['content_json'] = json_encode($examData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-                // Set skill checkboxes.
+                // tự động tick các ô kỹ năng
                 $defaultvalues['skill_reading'] = !empty($examData['reading']) ? 1 : 0;
                 $defaultvalues['skill_listening'] = !empty($examData['listening']) ? 1 : 0;
                 $defaultvalues['skill_writing'] = !empty($examData['writing']) ? 1 : 0;
                 $defaultvalues['skill_speaking'] = !empty($examData['speaking']) ? 1 : 0;
 
-                // Set durations (convert seconds to minutes).
+                // set các thời lượng.
                 if (!empty($examData['durations'])) {
                     $defaultvalues['duration_reading'] = isset($examData['durations']['reading'])
                         ? intval($examData['durations']['reading'] / 60) : 60;
@@ -409,23 +345,20 @@ class mod_ielts_mod_form extends moodleform_mod {
                         ? intval($examData['durations']['speaking'] / 60) : 15;
                 }
 
-                // Store for builder initialization.
+                // đồng bộ dữ liệu sang trường ẩn cho Builder
                 $defaultvalues['builder_json'] = $defaultvalues['content_json'];
             }
         }
     }
 
     /**
-     * Process form data before saving.
-     *
-     * @param stdClass $data Form data
-     * @return stdClass Processed data
+     * xử lý dữ liệu trước khi lưu vào db.
      */
     public function get_data() {
         $data = parent::get_data();
 
         if ($data) {
-            // Use builder JSON if builder method was selected and has content.
+            // nếu dùng builder -> ghi đè nội dung json từ builder vào trường lưu trữ.
             if (isset($data->inputmethod) && $data->inputmethod === 'builder' && !empty($data->builder_json)) {
                 $data->content_json = $data->builder_json;
             }

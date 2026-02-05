@@ -1,3 +1,4 @@
+<!-- database init -->
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="mod/ielts/db" VERSION="20260125" COMMENT="XMLDB file for mod_ielts activity module"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

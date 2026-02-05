@@ -88,7 +88,7 @@ function render_exam_page($ielts, $cm, $course, $context) {
     $cssurl = $maincss ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $maincss : '';
     $jsurl = $mainjs ? $CFG->wwwroot . '/mod/ielts/build/assets/' . $mainjs : '';
 
-    // Xuất mã HTML thuần, không dùng Header/Footer của Moodle để tránh xung đột với CSS của React
+    // xuất mã html
     ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -116,7 +116,7 @@ function render_exam_page($ielts, $cm, $course, $context) {
 }
 
 /**
- * Hàm hiển thị trang tổng quan của hoạt động IELTS.
+ * hàm hiển thị trang tổng quan
  */
 function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
     global $PAGE, $OUTPUT, $USER, $DB;
@@ -127,33 +127,31 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
     $PAGE->set_heading($course->fullname);
     $PAGE->set_context($context);
 
-    // Sử dụng bố cục chuẩn.
     $PAGE->set_pagelayout('standard');
 
-    // Xuất phần đầu trang.
     echo $OUTPUT->header();
 
-    // Hiển thị tên hoạt động và phần giới thiệu.
+    // hiển thị tên hoạt động và phần giới thiệu.
     echo html_writer::tag('h2', format_string($ielts->name), ['class' => 'ielts-title mb-3']);
 
     if (!empty($ielts->intro)) {
         echo html_writer::div(format_module_intro('ielts', $ielts, $cm->id), 'ielts-intro mb-4');
     }
 
-    // Nếu bài thi chưa được cấu hình, hiển thị thông báo.
+    // cảnh báo nếu chưa được cấu hình
     if (!$examConfigured) {
         echo $OUTPUT->notification(get_string('examnotconfigured', 'mod_ielts'), 'warning');
         echo $OUTPUT->footer();
         return;
     }
 
-    // Xử lý và lấy dữ liệu các lần làm bài của người dùng hiện tại.
+    // xử lý và lấy dữ liệu các lần làm bài của người dùng hiện tại.
     $attempts = $DB->get_records('ielts_attempts', [
         'ieltsid' => $ielts->id,
         'userid' => $USER->id,
     ], 'timecreated DESC');
 
-    // Hiển thị tóm tắt các lần làm bài.
+    // hiển thị tóm tắt các lần làm bài.
     $attemptcount = count($attempts);
     $bestband = 0;
 
@@ -165,16 +163,16 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         }
     }
 
-    // Kiểm tra xem người dùng có thể làm thêm lần thi hay không.
+    // kiểm tra xem người dùng có thể làm thêm lần thi hay không.
     $canmakeattempt = true;
-    $attemptsremaining = -1; // -1 nghĩa là không giới hạn.
+    $attemptsremaining = -1; // -1 = không giới hạn
     
     if ($ielts->maxattempts > 0) {
         $attemptsremaining = $ielts->maxattempts - $attemptcount;
         $canmakeattempt = $attemptsremaining > 0;
     }
 
-    // Liên kết chấm điểm thủ công (nếu người dùng có quyền chấm điểm).
+    // liên kết chấm điểm thủ công nếu người dùng có quyền chấm điểm
     if (has_capability('mod/ielts:grade', $context)) {
         $examdata = json_decode($ielts->content_json, true);
         $haswriting = !empty($examdata['writing']);
@@ -200,7 +198,7 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         }
     }
 
-    // Card tóm tắt các lần làm bài.
+    // card tóm tắt các lần làm bài.
     echo html_writer::start_div('card mb-4');
     echo html_writer::start_div('card-body');
     echo html_writer::tag('h5', get_string('yourattempts', 'mod_ielts'), ['class' => 'card-title']);
@@ -245,7 +243,7 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
     echo html_writer::end_div();
     echo html_writer::end_div();
 
-    // Bảng lịch sử các lần làm bài.
+    // bảng lịch sử các lần làm bài.
     if ($attemptcount > 0) {
         echo html_writer::start_div('card');
         echo html_writer::start_div('card-body');
@@ -336,13 +334,12 @@ function render_overview_page($ielts, $cm, $course, $context, $examConfigured) {
         echo html_writer::end_div();
         echo html_writer::end_div();
     } else {
-        // No attempts yet.
+        // no attempts yet
         echo html_writer::start_div('alert alert-info');
         echo html_writer::tag('i', '', ['class' => 'fa fa-info-circle mr-2']);
         echo get_string('noattemptsyet', 'mod_ielts');
         echo html_writer::end_div();
     }
 
-    // In ra Footer của Moodle
     echo $OUTPUT->footer();
 }

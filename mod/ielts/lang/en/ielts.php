@@ -361,6 +361,7 @@ $string['completionusegrade'] = 'Student must achieve a minimum band score';
 $string['completionmingrade'] = 'Minimum band score';
 $string['completionmingradegroup'] = 'Student must achieve a minimum band score';
 $string['completionmingrade_help'] = 'The activity is considered complete when the student achieves at least the specified band score.';
+$string['minimumband'] = 'Band score';
 $string['completionpassgrade'] = 'Student must achieve the pass grade';
 $string['completionpassgrade_help'] = 'The activity is considered complete when the student achieves the pass grade or higher.';
 
